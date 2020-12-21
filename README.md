@@ -7,7 +7,7 @@ EnView consists of three main scripts - enview_db.py, extract.py and visualize.p
 
 The code can be downloaded simply through cloning the git repository:
 
-'''git clone https://github.com/EbmeyerSt/EnView.git'''
+`git clone https://github.com/EbmeyerSt/EnView.git`
 
 # Dependencies
 
