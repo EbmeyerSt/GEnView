@@ -3,6 +3,12 @@ A phylogeny based comparative genomics software to analyze the genetic environme
 
 # Installation
 
+EnView consists of three main scripts - enview_db.py, extract.py and visualize.py
+
+The code can be downloaded simply through cloning the git repository:
+
+git clone 
+
 # Dependencies
 
 # Usage
