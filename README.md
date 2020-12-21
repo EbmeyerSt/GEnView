@@ -70,4 +70,49 @@ optional arguments:
 
 **WARNING**: if you specify --taxa 'all', enview_db.py will attempt to download all available genomes and plasmids - > 4TB of data! Processing of all data at once will take several **days**. Consider downloading smaller subsets instead. If you do not know in which taxa your gene is present, we recommend doing a manual blast at https://blast.ncbi.nlm.nih.gov/Blast.cgi first - This will show you in which taxa your protein is found!
 
+`extract.py` extracts the gene coding for the reference protein and its genetic environment as multifasta from the previously created database.
+
+```
+usage: extract_genes_sqlite_v7.5.py [-h] [-genes GENES [GENES ...]] -o O -db
+                                    DB -id ID -flank FLANK
+                                    [-taxa TAXA [TAXA ...]]
+
+________________________________________________________________________________
+
+Extract specified genes and flanking regions from db	
+________________________________________________________________________________
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -genes GENES [GENES ...]
+                        genes to extract. If list: "qnrA" "qnrB" ...
+  -o O                  path to output directory
+  -db DB                sqlite db file
+  -id ID                percent identity threshold for genes to extract
+  -flank FLANK          path to file containing flanking regions (.csv)
+  -taxa TAXA [TAXA ...]
+                        list of genera and/or species to extract.
+                        	By default all taxa are extracted
+```
+
+`visualize.py` takes the previously extracted sequences as input and creates a pdf visualizing the reference gene in its genetic environment
+
+```
+usage: visualize_v8_py3.py [-h] -db DB -o O [--force] [--compressed] [--all]
+
+________________________________________________________________________________
+
+Visualize annotate genes and genetic environments
+________________________________________________________________________________
+
+optional arguments:
+  -h, --help    show this help message and exit
+  -db DB        sqlite3 db containing annotations
+  -o O          target directory
+  --force       Force new alignment and phylogeny
+  --compressed  Compress number of displayed sequences
+  --all         Create visualizations for all gene analyses in directory
+```
+
+
 # Output files
