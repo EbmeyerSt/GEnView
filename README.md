@@ -34,17 +34,14 @@ The following softwares should be located in your $PATH:
 
 `enview_db.py` automatically downloads genomes (and if specied, plasmids) of the specified species from the NCBI Assembly/NR database and search them for the provided reference protein(s). Up to 20kb are extracted upstream and downstream, annotated and aligned.
 
-```usage: enview_db.py [-h] -d TARGET_DIRECTORY -db DATABASE
+```
+usage: enview_db.py [-h] -d TARGET_DIRECTORY -db DATABASE
                                   [-p PROCESSES] [-id IDENTITY] [--erase]
                                   [-scov SUBJECT_COVERAGE] -env ENV_DB -split
                                   SPLIT [--update] [--is_db IS_DB]
                                   [--taxa TAXA [TAXA ...]] [--assemblies]
                                   [--plasmids] [--integron_finder]
 
-________________________________________________________________________________
-
-Creates a database in .json format of genomes with annotation of a chosen set of genes including the specific gene sequences, upstream and downstream regions. Database is created in json format.
-________________________________________________________________________________
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -68,7 +65,8 @@ optional arguments:
                         taxon/taxa names to download genomes for - use "all" do download all available genomes
   --assemblies          Search NCBI Assembly database 
   --plasmids            Search NCBI Refseq plasmid database
-  --integron_finder     Use integron_finderv2 for integron identification```
+  --integron_finder     Use integron_finderv2 for integron identification
+  ```
 
 WARNING: if you specify --taxa 'all', enview_db.py will attempt to download all available genomes and plasmids - > 4TB of data! Processing of all data at once will take several DAYS. Consider downloading smaller subsets instead. If you do not know in which taxa your gene is present, we recommend doing a manual blast at https://blast.ncbi.nlm.nih.gov/Blast.cgi first - This will show you in which taxa your protein is found!
 # Output files
