@@ -10,6 +10,20 @@ The code can be downloaded simply through cloning the git repository:
 `git clone https://github.com/EbmeyerSt/EnView.git`
 
 # Dependencies
+* Python >=3.7.6
+  * ete3 >=3.1.1
+  * pandas >=1.0.3
+  * sqlite3 >=2.6
+  
+* Diamond >=0.9.24
+* Prodigal >=2.6.3
+* CD-hit >=4.7
+* Usearch >=8.0.1445
+* mafft >=7.310
+* FastTree >=2.1.9
+(optional)
+* integron_finder >= 2
+
 
 # Usage
 
