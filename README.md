@@ -113,3 +113,12 @@ optional arguments:
  specifying `--compressed` will cluster all sequences at 95% nucleotide identity and remove duplicates. Only the centroids of the resulting clusters will be visualized. 
 
 # Output files
+
+The following output files will be produced in the specified output directory when running `visualize.py`:
+
+**annotation_meta.csv** - Contains information on annotated genes in the extracted range of the target gene, such as name, position and sequence
+**yourgenename_contexts._tree_annotated.pdf** - PDF containing a phylogeny based visualization of the target genes genetic environment
+**yourgenename_contexts.fna** - FASTA file containing extracted sequence (target gene+genetic environment) for every genome
+**yourgenename_contexts.unique.fna** - FASTA file containing extracted sequence (target gene+genetic environment) for every genome after removing duplicates
+**yourgenename_contexts.unique.aln** Alignment of unique extracted sequences
+**yourgenename_contexts.unique.tree** Tree file created by FastTree2
