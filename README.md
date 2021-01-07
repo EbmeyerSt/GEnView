@@ -110,6 +110,6 @@ optional arguments:
   --compressed  Compress number of displayed sequences
   --all         Create visualizations for all gene analyses in directory
 ```
-
+ specifying `--compressed` will cluster all sequences at 95% nucleotide identity and remove duplicates. Only the centroids of the resulting clusters will be visualized. 
 
 # Output files
