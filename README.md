@@ -37,7 +37,7 @@ The following softwares should be located in your $PATH:
 ```
 usage: enview_db.py [-h] -d TARGET_DIRECTORY -db DATABASE
                                   [-p PROCESSES] [-id IDENTITY] [--erase]
-                                  [-scov SUBJECT_COVERAGE] -env ENV_DB -split
+                                  [-scov SUBJECT_COVERAGE] -split
                                   SPLIT [--update] [--is_db IS_DB]
                                   [--taxa TAXA [TAXA ...]] [--assemblies]
                                   [--plasmids] [--integron_finder]
@@ -56,8 +56,6 @@ optional arguments:
   --erase               erase results of previous analysis and create new ones
   -scov SUBJECT_COVERAGE, --subject_coverage SUBJECT_COVERAGE
                         minimum coverage for a hit to be saved to db
-  -env ENV_DB, --env_db ENV_DB
-                        database to annotate genetic environment
   -split SPLIT          number of files to obtain for processing flanking regions (increasing annotation speed)
   --update              downloads new genomes and updates database
   --is_db IS_DB         database containing IS, integrons, ISCR sequences
@@ -74,7 +72,7 @@ optional arguments:
 
 ```
 usage: extract_genes_sqlite_v7.5.py [-h] [-genes GENES [GENES ...]] -o O -db
-                                    DB -id ID -flank FLANK
+                                    DB -id ID
                                     [-taxa TAXA [TAXA ...]]
 
 ________________________________________________________________________________
@@ -89,7 +87,6 @@ optional arguments:
   -o O                  path to output directory
   -db DB                sqlite db file
   -id ID                percent identity threshold for genes to extract
-  -flank FLANK          path to file containing flanking regions (.csv)
   -taxa TAXA [TAXA ...]
                         list of genera and/or species to extract.
                         	By default all taxa are extracted
