@@ -296,18 +296,18 @@ def visualize_phylogeny(gene_dict, context_file):
 				motifs=[]
 
 				#Assign start and end position for annotated gene
-				gene_start=gene_dict[key]['start']
-				gene_end=gene_dict[key]['stop']
+				gene_start=int(gene_dict[key]['start']/5)
+				gene_end=int(gene_dict[key]['stop']/5)
 
 				#Sort such that the greater number is end and smaller is start
 				if gene_start>gene_end:
 
-					gene_end=gene_dict[key]['start']
-					gene_start=gene_dict[key]['stop']
+					gene_end=int(gene_dict[key]['start']/5)
+					gene_start=int(gene_dict[key]['stop']/5)
 				
 				#Append motif for annotated gene
 				gene_motif=[gene_start, gene_end,'()', \
-				2, 10, 'red', 'red', 'arial|10|black|'+str(gene_dict[key]['name'])]
+				2, 10, 'red', 'red', 'arial|8|black|'+str(gene_dict[key]['name'])]
 
 				if not str(gene_dict[key]['frame']).startswith('-'):
 					ori_motif=[gene_end, gene_end+10, '>', 2, 10, 'red', 'red', None]
@@ -335,8 +335,8 @@ def visualize_phylogeny(gene_dict, context_file):
 						color='grey'
 
 					#Create motif for one env gene at a time and append to motif list
-					motif=[value2['env_start'], value2['env_stop'], '()', 2, 10, color, color, \
-					'arial|10|black|'+str(value2['env_name'])]
+					motif=[int(value2['env_start']/5), int(value2['env_stop']/5), '()', 2, 10, color, color, \
+					'arial|8|black|'+str(value2['env_name'])]
 
 					#Set condition: If env gene != annotated gene, append motif
 					arg_pos={i for i in range(int(gene_motif[0]), int(gene_motif[1]))}
@@ -344,18 +344,18 @@ def visualize_phylogeny(gene_dict, context_file):
 					
 					#Calculate overlap percentage between annotated gene and env gene
 					total_overlap=float(len(arg_pos.intersection(env_pos)))
-					overlap_perc=float(total_overlap/int(gene_dict[key]['length']))*100
+					overlap_perc=float(total_overlap/int(gene_dict[key]['length']/5))*100
 
 					if overlap_perc<=70.0:
 						motifs.append(motif)
 
 						#Create additional motif to show gene orientation
 						if value2['env_strand']=='+':
-							ori_motif=[value2['env_stop'], value2['env_stop']+10, '>', 2, 10, \
+							ori_motif=[int(value2['env_stop']/5), int(value2['env_stop']/5+10), '>', 2, 10, \
 							color, color, None]
 
 						else:
-							ori_motif=[value2['env_start']-10, value2['env_start'], '<', 2, 10, \
+							ori_motif=[int(value2['env_start']/5-10), int(value2['env_start']/5), '<', 2, 10, \
 							color, color, None]
 
 						motifs.append(ori_motif)
