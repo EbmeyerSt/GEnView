@@ -1,9 +1,9 @@
-# EnView
+# GEnView
 A phylogeny based comparative genomics software to analyze the genetic environment of genes. The user can select one or several taxa and provide one or several reference protein(s). Genomes and plasmids (based on user choice) will be downloaded from the NCBI Assembly/NR database and searched for the respective gene. Up to 20kb of the genes genetic environment are extracted, annotated and aligned between all genomes. The sequences are then visualized, enabling comparison of synteny and gene content.
 
 # Installation
 
-EnView consists of three main scripts - enview_db.py, extract.py and visualize.py
+GEnView consists of three main scripts - genview_create_db.py, genview_extract.py and genview_visualize.py
 
 The code can be downloaded simply through cloning the git repository:
 
@@ -11,7 +11,7 @@ The code can be downloaded simply through cloning the git repository:
 
 # Dependencies
 
-We recommend to set up a virtual environment and install all dependencies to run EnView there.
+We recommend to set up a virtual environment and install all dependencies to run GEnView there.
 
 * Python >=3.7.6
   * ete3 >=3.1.1
@@ -32,16 +32,20 @@ The following softwares should be located in your $PATH:
 
 # Usage
 
-`enview_db.py` automatically downloads genomes (and if specied, plasmids) of the specified species from the NCBI Assembly/NR database and search them for the provided reference protein(s). Up to 20kb are extracted upstream and downstream, annotated and aligned.
+`genview_create_db.py` automatically downloads genomes (and if specied, plasmids) of the specified species from the NCBI Assembly/NR database and search them for the provided reference protein(s). Up to 20kb are extracted upstream and downstream, annotated and aligned.
 
 ```
-usage: enview_db.py [-h] -d TARGET_DIRECTORY -db DATABASE
-                                  [-p PROCESSES] [-id IDENTITY] [--erase]
-                                  [-scov SUBJECT_COVERAGE] -split
-                                  SPLIT [--update] [--is_db IS_DB]
-                                  [--taxa TAXA [TAXA ...]] [--assemblies]
-                                  [--plasmids] [--integron_finder]
+usage: genview_create_db.py [-h] -d TARGET_DIRECTORY -db DATABASE
+                           [-p PROCESSES] [-id IDENTITY] [--erase]
+                           [-scov SUBJECT_COVERAGE] -split SPLIT [--update]
+                           [--is_db IS_DB] [--taxa TAXA [TAXA ...]]
+                           [--assemblies] [--plasmids] [--integron_finder]
+                           [--save_tmps]
 
+________________________________________________________________________________
+
+Creates sqlite3 database with genetic environment from genomes containing the provided reference gene(s).
+________________________________________________________________________________
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -56,28 +60,29 @@ optional arguments:
   --erase               erase results of previous analysis and create new ones
   -scov SUBJECT_COVERAGE, --subject_coverage SUBJECT_COVERAGE
                         minimum coverage for a hit to be saved to db
-  -split SPLIT          number of files to obtain for processing flanking regions (increasing annotation speed)
+  -split SPLIT          number of files to obtain for processing flanking regions
   --update              downloads new genomes and updates database
   --is_db IS_DB         database containing IS, integrons, ISCR sequences
   --taxa TAXA [TAXA ...]
                         taxon/taxa names to download genomes for - use "all" do download all available genomes
-  --assemblies          Search NCBI Assembly database 
+  --assemblies          Search NCBI Assembly database
   --plasmids            Search NCBI Refseq plasmid database
   --integron_finder     Use integron_finderv2 for integron identification
+  --save_tmps           keep temporary files
   ```
 
 **WARNING**: if you specify --taxa 'all', enview_db.py will attempt to download all available genomes and plasmids - > 4TB of data! Processing of all data at once will take several **days**. Consider downloading smaller subsets instead. If you do not know in which taxa your gene is present, we recommend doing a manual blast at https://blast.ncbi.nlm.nih.gov/Blast.cgi first - This will show you in which taxa your protein is found!
 
-`extract.py` extracts the gene coding for the reference protein and its genetic environment as multifasta from the previously created database.
+`genview_extract.py` extracts the gene coding for the reference protein and its genetic environment as multifasta from the previously created database.
 
 ```
-usage: extract_genes_sqlite_v7.5.py [-h] [-genes GENES [GENES ...]] -o O -db
-                                    DB -id ID
-                                    [-taxa TAXA [TAXA ...]]
+
+usage: genview_extract.py [-h] [-genes GENES [GENES ...]] -o O -db DB -id ID
+                         [-taxa TAXA [TAXA ...]]
 
 ________________________________________________________________________________
 
-Extract specified genes and flanking regions from db	
+Extract specified genes and flanking regions from db
 ________________________________________________________________________________
 
 optional arguments:
@@ -85,17 +90,18 @@ optional arguments:
   -genes GENES [GENES ...]
                         genes to extract. If list: "qnrA" "qnrB" ...
   -o O                  path to output directory
-  -db DB                sqlite db file
+  -db DB                path to sqlite db file in original directory
   -id ID                percent identity threshold for genes to extract
   -taxa TAXA [TAXA ...]
                         list of genera and/or species to extract.
-                        	By default all taxa are extracted
-```
-
-`visualize.py` takes the previously extracted sequences as input and creates a pdf visualizing the reference gene in its genetic environment
+                                By default all taxa are extracted
 
 ```
-usage: visualize_v8_py3.py [-h] -db DB -o O [--force] [--compressed] [--all]
+
+`genview_visualize.py` takes the previously extracted sequences as input and creates a pdf visualizing the reference gene in its genetic environment
+
+```
+usage: genview_visualize.py [-h] -db DB -o O [--force] [--compressed] [--all]
 
 ________________________________________________________________________________
 
@@ -109,6 +115,7 @@ optional arguments:
   --force       Force new alignment and phylogeny
   --compressed  Compress number of displayed sequences
   --all         Create visualizations for all gene analyses in directory
+
 ```
  specifying `--compressed` will cluster all sequences at 95% nucleotide identity and remove duplicates. Only the centroids of the resulting clusters will be visualized. 
 
