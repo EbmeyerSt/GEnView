@@ -140,8 +140,8 @@ def read_db(context_file):
 		#To sort genes in right order in annotation metafile, create list of gene starts and stops
 		for key, value in gene_dict.items():
 
-			outfile.write('_'*20+'\n'+gene_dict[key]['name']+'__'+str(key)+'__'+gene_dict[key]['organism']+'\n'+\
-			'-'*20+'\n'
+			outfile.write('_'*20+'\n'+gene_dict[key]['name']+'__'+str(key)+'__'+gene_dict[key]['organism']+\
+			'__'+gene_dict[key]['assembly']+'\n'+'-'*20+'\n'
 			)
 			position_list=[]
 			lines=[]
