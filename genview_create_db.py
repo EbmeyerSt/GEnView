@@ -1,6 +1,7 @@
 #!/usr/local/env python3.7
 
 import pandas as pd
+import timeit
 import numpy as np
 from Bio import SeqIO
 from shutil import copyfile
@@ -54,6 +55,7 @@ def parse_arguments():
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
 	parser.add_argument('--integron_finder', help='Use integron_finderv2 for integron identification', action='store_true', default='False')
 	parser.add_argument('--save_tmps', help='keep temporary files', action='store_true', default='False')
+	parser.add_argument('--acc_list', help='csv file containing one accession per row', default='False')
 	args=parser.parse_args()
 
 	return args
@@ -505,10 +507,10 @@ def download_plasmids():
 		sum_num=len(sum_files)
 
 #	Disable for debugging
-#	print('Writing plasmid summary file...')
-#	with open(args.target_directory.rstrip('/')+'/plasmid_summary.txt'+'.'+str(sum_num), 'w') as outfile:
-#		for key, value in plasmid_dict.items():
-#			outfile.write(str(key.split(' ')[0].lstrip('>'))+'\t'+' '.join(key.split(' ')[1:3])+'\n')
+	print('Writing plasmid summary file...')
+	with open(args.target_directory.rstrip('/')+'/plasmid_summary.txt'+'.'+str(sum_num), 'w') as outfile:
+		for key, value in plasmid_dict.items():
+			outfile.write(str(key.split(' ')[0].lstrip('>'))+'\t'+' '.join(key.split(' ')[1:3])+'\n')
 	
 	#add lineage to plasmid entries
 	print('adding lineages to plasmids...')
@@ -559,70 +561,101 @@ def download_plasmids():
 		for spec in old_spec_set:
 			args.taxa.append(spec)
 
-		print('comparing summary files...')
-		#compare old and new assembly_summary files, get list of genomes that are in new but not in old
-		summary_files=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
-		if file.startswith('plasmid_summary')]
+		if args.acc_list=='False':
+			print('comparing summary files...')
+			#compare old and new assembly_summary files, get list of genomes that are in new but not in old
+			summary_files=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
+			if file.startswith('plasmid_summary')]
 
-		newest=sorted(summary_files)[-1]
-		previous=sorted(summary_files)[-2]
+			newest=sorted(summary_files)[-1]
+			previous=sorted(summary_files)[-2]
 
-		previous_plas_accs=[line.split('\t')[0] for line in open(previous, 'r')]
-		new_plas_accs=[line.split('\t')[0] for line in open(newest, 'r') if not line.split('\t')[0] \
-		in previous_plas_accs]
+			previous_plas_accs=[line.split('\t')[0] for line in open(previous, 'r')]
+			new_plas_accs=[line.split('\t')[0] for line in open(newest, 'r') if not line.split('\t')[0] \
+			in previous_plas_accs]
 
-		print('%d novel plasmids identified!' % len(new_plas_accs))
+			print('%d novel plasmids identified!' % len(new_plas_accs))
 
-		if not args.taxa=='all':
+		else:
+			
+			newest=sorted(summary_files)[-1]
+			new_plas_accs=[line.split('\t')[0] for line in open(newest, 'r') and not line.startswith('#')]
+
+		if not args.acc_list=='False':
+			genome_accessions=[line.rstrip('\n') for line in open(args.acc_list)]
 			hits=0
 			for key, value in new_plasmid_dict.items():
-				print(key,new_plas_accs)
 				#Filter by taxonomy:
-				if any(taxon.lower() in ' '.join(value['lineage']).lower() for taxon\
-				in args.taxa) and key in new_plas_accs:
-
+				if key in genome_accessions and key in new_plas_accs:
 					hits+=1
 					with open(args.target_directory.rstrip('/')+'/update_tmp/'\
 					+key+'_genomic.fna', 'w') as outfile:
 						outfile.write('>'+key+' plasmid\n'+value['seq'])
-			
-			if hits>=1:
-				print('Plasmids written to file!')
-			else:
-				print('No plasmids found for the searched taxa!')
-				if not args.assemblies==True:
-					sys.exit()
+
 		else:
-			for key, value in new_plasmid_dict.items():
-				if key in new_plas_accs:
-					with open(args.target_directory.rstrip('/')+'/update_tmp/'\
-					+key+'_genomic.fna', 'w') as outfile:
-						outfile.write('>'+key+' plasmid\n'+value['seq'])
+
+			if not args.taxa=='all':
+				hits=0
+				for key, value in new_plasmid_dict.items():
+					#Filter by taxonomy:
+					if any(taxon.lower() in ' '.join(value['lineage']).lower() for taxon\
+					in args.taxa) and key in new_plas_accs:
+
+						hits+=1
+						with open(args.target_directory.rstrip('/')+'/update_tmp/'\
+						+key+'_genomic.fna', 'w') as outfile:
+							outfile.write('>'+key+' plasmid\n'+value['seq'])
+				
+				if hits>=1:
+					print('Plasmids written to file!')
+				else:
+					print('No plasmids found for the searched taxa!')
+					if not args.assemblies==True:
+						sys.exit()
+			else:
+				for key, value in new_plasmid_dict.items():
+					if key in new_plas_accs:
+						with open(args.target_directory.rstrip('/')+'/update_tmp/'\
+						+key+'_genomic.fna', 'w') as outfile:
+							outfile.write('>'+key+' plasmid\n'+value['seq'])
 
 	else:
-		if not args.taxa=='all':
+
+		
+		if not args.acc_list=='False':
+			genome_accessions=[line.rstrip('\n') for line in open(args.acc_list)]
 			hits=0
 			for key, value in new_plasmid_dict.items():
 				#Filter by taxonomy:
-				if any(taxon.lower() in ' '.join(value['lineage']).lower() for taxon\
-				in args.taxa):
-
+				if key in genome_accessions and key in new_plas_accs:
 					hits+=1
+					with open(args.target_directory.rstrip('/')+'/update_tmp/'\
+					+key+'_genomic.fna', 'w') as outfile:
+						outfile.write('>'+key+' plasmid\n'+value['seq'])
+		else:
+			if not args.taxa=='all':
+				hits=0
+				for key, value in new_plasmid_dict.items():
+					#Filter by taxonomy:
+					if any(taxon.lower() in ' '.join(value['lineage']).lower() for taxon\
+					in args.taxa):
+
+						hits+=1
+						with open(args.target_directory.rstrip('/')+'/'\
+						+key+'_genomic.fna', 'w') as outfile:
+							outfile.write('>'+key+' plasmid\n'+value['seq'])
+				
+				if hits>=1:
+					print('Plasmids written to file!')
+				else:
+					print('No plasmids found for the searched taxa!')
+					if not args.assemblies==True:
+						sys.exit()
+			else:
+				for key, value in new_plasmid_dict.items():
 					with open(args.target_directory.rstrip('/')+'/'\
 					+key+'_genomic.fna', 'w') as outfile:
 						outfile.write('>'+key+' plasmid\n'+value['seq'])
-			
-			if hits>=1:
-				print('Plasmids written to file!')
-			else:
-				print('No plasmids found for the searched taxa!')
-				if not args.assemblies==True:
-					sys.exit()
-		else:
-			for key, value in new_plasmid_dict.items():
-				with open(args.target_directory.rstrip('/')+'/'\
-				+key+'_genomic.fna', 'w') as outfile:
-					outfile.write('>'+key+' plasmid\n'+value['seq'])
 
 	#Remove plasmids_tmp
 	#shutil.rmtree(args.target_directory.rstrip('/')+'/plasmids_tmp')
@@ -646,13 +679,18 @@ def update():
 		newest=sorted(summary_files)[-1]
 		previous=sorted(summary_files)[-2]
 
-		print('comparing assembly summary files...')
-		previous_asms=[line.split('\t')[0] for line in open(previous, 'r') if not line.startswith('#')]
-		new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.split('\t')[0] \
-		in previous_asms and not line.startswith('#')]
-		
-		print('%d new assemblies found!' % len(new_genome_urls)) 
-		print(new_genome_urls)
+		if args.acc_list=='False':
+			print('comparing assembly summary files...')
+			previous_asms=[line.split('\t')[0] for line in open(previous, 'r') if not line.startswith('#')]
+			new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.split('\t')[0] \
+			in previous_asms and not line.startswith('#')]
+			
+			print('%d new assemblies found!' % len(new_genome_urls)) 
+			print(new_genome_urls)
+
+		else:
+
+			new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.startswith('#')]
 	
 		print('Update: creating temporary download directory...')
 		#Create temporary directory for downloading novel assemblies
@@ -666,13 +704,17 @@ def update():
 
 		asm_dict={}
 		excepts=0
-		for line in open(newest, 'r'):
+		new_lines=[line for line in open(newest,'r') if not line.startswith('#')]
+		newlines_inc=[line for line in new_lines if line.split('\t')[19] in new_genome_urls]
+		for line in newlines_inc:
 			
-			if line.split('\t')[19] in new_genome_urls:
-				print('HERE!')
-				asm_dict[line.split('\t')[0]]={}
-				asm_dict[line.split('\t')[0]]['tax_id']=line.split('\t')[5]
-				asm_dict[line.split('\t')[0]]['url']=line.split('\t')[19]
+			asm_dict[line.split('\t')[0]]={}
+			asm_dict[line.split('\t')[0]]['tax_id']=line.split('\t')[5]
+			asm_dict[line.split('\t')[0]]['url']=line.split('\t')[19]
+
+			if args.acc_list=='False':
+				
+				print('Assigning lineages...')
 				try:
 					asm_dict[line.split('\t')[0]]['sci_lineage']=new_lineages[line.split('\t')[5]]['sci_lineage']
 					asm_dict[line.split('\t')[0]]['lineage']=new_lineages[line.split('\t')[5]]['lineage']
@@ -681,33 +723,36 @@ def update():
 					asm_dict[line.split('\t')[0]]['sci_lineage']='unassigned'
 					asm_dict[line.split('\t')[0]]['lineage']='unassigned'
 
-		print(f'lineages assigned, {excepts} of {len(asm_dict)} could not be assigned')
-		if excepts>100:
-			print('Maybe it\'s time to update the database?')
+				print(f'lineages assigned, {excepts} of {len(asm_dict)} could not be assigned')
 
+				#Connect to database and fetch species present in previous database version
+				connection=sqlite3.connect(args.target_directory.rstrip('/')+'/context_db_flank.db')
+				cursor=connection.cursor()
 
-		#Connect to database and fetch species present in previous database version
-		connection=sqlite3.connect(args.target_directory.rstrip('/')+'/context_db_flank.db')
-		cursor=connection.cursor()
+				query="""SELECT organism from genomes;"""
+				cursor.execute(query)
+				old_specs=cursor.fetchall()
+				old_spec_set={spec[0] for spec in old_specs}
 
-		query="""SELECT organism from genomes;"""
-		cursor.execute(query)
-		old_specs=cursor.fetchall()
-		old_spec_set={spec[0] for spec in old_specs}
-
-		for spec in old_spec_set:
-			args.taxa.append(spec)
+				for spec in old_spec_set:
+					args.taxa.append(spec)
 
 		#Now multiprocess the download of these new genomes into temporary folder
 		#disable for now to make sure not all genomes have to be downloaded again
 		#TODO add exact line lineage in summary file
-		if not args.taxa=='all':
 
-			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if any(taxon.lower() in \
-			' '.join(asm_dict[key]['sci_lineage']).lower() for taxon in args.taxa)]
+		if not args.acc_list=='False':
+			genome_accessions=[line.rstrip('\n').lower() for line in open(args.acc_list, 'r')]
+			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if key.lower() in genome_accessions]
+		
 		else:
-			
-			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
+			if not args.taxa=='all':
+
+				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if any(taxon.lower() in \
+				' '.join(asm_dict[key]['sci_lineage']).lower() for taxon in args.taxa)]
+			else:
+				
+				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
 		processes=10
 		print(f'GENOME URLS:{genome_urls}')
 		multiprocess(download_new, processes, genome_urls)
@@ -1766,14 +1811,23 @@ def main():
 		#Now multiprocess the download of these new genomes into temporary folder
 		#disable for now to make sure not all genomes have to be downloaded again
 		#TODO add exact line lineage in summary file
-		if not args.taxa=='all':
-			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if any(taxon.lower() in \
-			' '.join(asm_dict[key]['sci_lineage']).lower() for taxon in args.taxa)]
+		if not args.acc_list=='False':
+			genome_accessions=[line.rstrip('\n').lower() for line in open(args.acc_list, 'r')]
+			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if key.lower() in genome_accessions]
+
 		else:
-			
-			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
-		processes=10
-		multiprocess(download_new, processes, genome_urls)
+			if not args.taxa=='all':
+				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if any(taxon.lower() in \
+				' '.join(asm_dict[key]['sci_lineage']).lower() for taxon in args.taxa)]
+			else:
+				
+				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
+
+		if len(genome_urls)>=1:
+			processes=10
+			multiprocess(download_new, processes, genome_urls)
+		else:
+			print('No genomes found that fit the provided input, exiting...')
 
 	if args.plasmids==True:
 		print('Fetching plasmids...')
@@ -2023,7 +2077,14 @@ def transposon_table():
 if __name__=='__main__':
 
 	args=parse_arguments()
+	if args.taxa and args.acc_list!=False:
+		print('\n--taxa cannot be specified at the same time as --acc_list, please choose only one option\n')
+		sys.exit()
+
 	if not args.update==True:
+		start=timeit.default_timer()
 		main()
+		stop=timeit.default_timer()
+		print('Time elapsed: ', stop-start)
 	else:
 		update()
