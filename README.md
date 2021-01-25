@@ -34,6 +34,8 @@ The following softwares should be located in your $PATH:
 
 `genview_create_db.py` automatically downloads genomes (and if specied, plasmids) of the specified species from the NCBI Assembly/NR database and search them for the provided reference protein(s). Up to 20kb are extracted upstream and downstream, annotated and aligned.
 
+An example walk-through can be found in the wiki: https://github.com/EbmeyerSt/GEnView/wiki
+
 ```
 usage: genview_create_db.py [-h] -d TARGET_DIRECTORY -db DATABASE
                            [-p PROCESSES] [-id IDENTITY] [--erase]
