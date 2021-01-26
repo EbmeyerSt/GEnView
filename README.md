@@ -17,6 +17,7 @@ We recommend to set up a virtual environment and install all dependencies to run
   * ete3 >=3.1.1
   * pandas >=1.0.3
   * sqlite3 >=2.6
+  * Biopython >=1.77
   
 The following softwares should be located in your $PATH:
   
