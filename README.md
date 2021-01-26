@@ -7,7 +7,7 @@ GEnView consists of three main scripts - genview_create_db.py, genview_extract.p
 
 The code can be downloaded simply through cloning the git repository:
 
-`git clone https://github.com/EbmeyerSt/EnView.git`
+`git clone https://github.com/EbmeyerSt/GEnView.git`
 
 # Dependencies
 
@@ -27,7 +27,7 @@ The following softwares should be located in your $PATH:
 * mafft >=7.310
 * FastTree >=2.1.9
 (optional)
-* integron_finder >= 2
+
 
 
 # Usage
@@ -59,7 +59,6 @@ optional arguments:
                         of cores to run the script on
   -id IDENTITY, --identity IDENTITY
                         identity cutoff for hits to be saved to the database
-  --erase               erase results of previous analysis and create new ones
   -scov SUBJECT_COVERAGE, --subject_coverage SUBJECT_COVERAGE
                         minimum coverage for a hit to be saved to db
   -split SPLIT          number of files to obtain for processing flanking regions
@@ -69,7 +68,6 @@ optional arguments:
                         taxon/taxa names to download genomes for - use "all" do download all available genomes
   --assemblies          Search NCBI Assembly database
   --plasmids            Search NCBI Refseq plasmid database
-  --integron_finder     Use integron_finderv2 for integron identification
   --save_tmps           keep temporary files
   --acc_list            File containing Assembly/plasmid accessions, one accession per row
   ```
