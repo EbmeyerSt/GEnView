@@ -13,13 +13,13 @@ from Bio.Seq import Seq
 
 
 def parse_arguments():
-	man_description='%r\n\nCreates sqlite3 database with genetic environment from genomes containing the provided reference gene(s).\n%r' % ('_'*80, '_'*80)
+	man_description='Creates sqlite3 database with genetic environment from genomes containing the provided reference gene(s).'
 	parser=argparse.ArgumentParser(description=man_description.replace("'", ""), formatter_class=RawTextHelpFormatter)
 	parser.add_argument('-d', '--target_directory', help='path to output directory', required=True)
 	parser.add_argument('-db', '--database', help='fasta/multifasta file containing amino acid sequences of translated genes to be annotated', required=True)
 	parser.add_argument('-p', '--processes', help='of cores to run the script on', type=int, default=multiprocessing.cpu_count())
-	parser.add_argument('-id', '--identity', help='identity cutoff for hits to be saved to the database (e.g 80 for 80% cutoff)', type=float, default=90)
-	parser.add_argument('-scov', '--subject_coverage', help='minimum coverage for a hit to be saved to db (e.g 80 for 80% cutoff)', type=float, default=90)
+	parser.add_argument('-id', '--identity', help='identity cutoff for hits to be saved to the database (e.g 80 for 80%% cutoff)', type=float, default=90)
+	parser.add_argument('-scov', '--subject_coverage', help='minimum coverage for a hit to be saved to db (e.g 80 for 80%% cutoff)', type=float, default=90)
 	parser.add_argument('--split', help='number of files to obtain for processing flanking regions', required=True, type=int)
 	parser.add_argument('--update', help='downloads new genomes and updates database', action='store_true')
 	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False)
