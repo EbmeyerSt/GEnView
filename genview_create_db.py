@@ -11,49 +11,21 @@ from multiprocessing import Manager
 from collections import defaultdict
 from Bio.Seq import Seq
 
-#In v7.2, flanking regions are not written to extra files but added to the new annotation file
-#In v7.3, all intermediate dictionaries that are possible to remove will be removed
-#In v7.4, prokka, now presenting a major bottleneck, will be replaced by prodigal
-#In v7.5, the function 'run_prodigal' will be split in two, running prodigal and diamond in separate instances
-#In v7.6, orfs are clustered before annotation with diamond to speed up annotation
-#In v7.7, update function will be integrated 
-#In v7.8, in concatenate_and_split, function is changed to faster method
-#In v7.9, gene clusters are added to the database, for the respective annotation db
-#In v8, new plasmids are also downloaded and added to the database
-#In v8, split_fasta() modified to work with and without update function
-#In v8.2, add annotation with IS database and HattCI
-#In v8.3, python version is changed from 2.7 to 3.7!
-#In v8.4, multiprocessing function replaces multiprocessing code blocks
-#In v8.5, integron finder is multiprocessed
-#In v8.6, update function is updated, accessions and organisms for ALL genomes are included
-#In v8.8, sequence independent clustering is solved more effectively, display order for each seq_cluster is determined 
-#In v8.9, update function is updated to work with the features introduced in v8.8
-#In v9, add taxonomy lineage to database
-#In v9.4, calculate reverse complement for all args encoded on - strand
-#In v9.5, add function to choose which genomes to download
-#In v9.7, plasmids and assemblies are made optional, taxonomy control added to plasmids
-#In v9.9, remove tables and columns from database that are not needed in the current functions (listed below) 
-#(cluster_gene_db, lineages_to_sql, display_order, display_to_sql, cluster_envs, align, rad_alignments)
-#Define arguments for the script, such as input files aso.
-#In v9.9.1, argument to keep temporary files was added - if not specified, temporary files are removed. function to download protein_db for env_gene annotation is added, download function for uniprot_db and IS_db
-
 
 def parse_arguments():
 	man_description='%r\n\nCreates sqlite3 database with genetic environment from genomes containing the provided reference gene(s).\n%r' % ('_'*80, '_'*80)
 	parser=argparse.ArgumentParser(description=man_description.replace("'", ""), formatter_class=RawTextHelpFormatter)
-	parser.add_argument('-d', '--target_directory', help='path to folder containing a folder for each assembly to be processed', required=True)
+	parser.add_argument('-d', '--target_directory', help='path to output directory', required=True)
 	parser.add_argument('-db', '--database', help='fasta/multifasta file containing genes to be annotated', required=True)
 	parser.add_argument('-p', '--processes', help='of cores to run the script on', type=int, default=multiprocessing.cpu_count())
-	parser.add_argument('-id', '--identity', help='identity cutoff for hits to be saved to the database', type=float, default=90)
-	parser.add_argument('--erase', help='erase results of previous analysis and create new ones', action='store_true')
-	parser.add_argument('-scov', '--subject_coverage', help='minimum coverage for a hit to be saved to db', type=float, default=90)
-	parser.add_argument('-split', help='number of files to obtain for processing flanking regions', required=True, type=int)
+	parser.add_argument('-id', '--identity', help='identity cutoff for hits to be saved to the database (e.g 80 for 80% cutoff)', type=float, default=90)
+	parser.add_argument('-scov', '--subject_coverage', help='minimum coverage for a hit to be saved to db (e.g 80 for 80% cutoff)', type=float, default=90)
+	parser.add_argument('--split', help='number of files to obtain for processing flanking regions', required=True, type=int)
 	parser.add_argument('--update', help='downloads new genomes and updates database', action='store_true')
 	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False)
 	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes', nargs='+')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
-	parser.add_argument('--integron_finder', help='Use integron_finderv2 for integron identification', action='store_true', default='False')
 	parser.add_argument('--save_tmps', help='keep temporary files', action='store_true', default='False')
 	parser.add_argument('--acc_list', help='csv file containing one accession per row', default='False')
 	args=parser.parse_args()
