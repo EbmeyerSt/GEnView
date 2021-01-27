@@ -1,11 +1,11 @@
 #!/usr/local/env python3.7
 
-import sys, os, subprocess, argparse, ete3, sqlite3
+import sys, os, subprocess, argparse, ete3, sqlite3, timeit
 from argparse import RawTextHelpFormatter
 from ete3 import SeqMotifFace, TreeStyle, add_face_to_node, Tree, NodeStyle, TextFace, COLOR_SCHEMES, SVG_COLORS, random_color
 
 def parse_arguments():
-	descr='%r\n\nVisualize annotate genes and genetic environments\n%r' % ('_'*80, '_'*80)
+	descr='\nVisualize annotate genes and genetic environments\n'
 	parser=argparse.ArgumentParser(description=descr.replace("'", ''), formatter_class=RawTextHelpFormatter)
 	parser.add_argument('-db', help='sqlite3 db containing annotations', required=True)
 	parser.add_argument('-o', help='target directory', required=True)
@@ -455,13 +455,19 @@ def main():
 if __name__=='__main__':
 	args=parse_arguments()
 	if not args.all==True:
+		start=timeit.default_timer()
 		main()
+		stop=timeit.default_timer()
+		print('Time elapsed: ', stop-start)
 	else:
 		outfiles=[element[0] for element in os.walk(args.o)]
 		outdirs=outfiles[1:]
 		for outdir in outdirs:
 			args.o=outdir
 			try:
+				start=timeit.default_timer()
 				main()
+				stop=timeit.default_timer()
+				print('Time elapsed: ', stop-start)
 			except:
 				print(f'Something went wrong when trying to process {args.o}!')

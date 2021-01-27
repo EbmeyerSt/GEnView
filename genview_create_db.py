@@ -28,6 +28,7 @@ def parse_arguments():
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
 	parser.add_argument('--save_tmps', help='keep temporary files', action='store_true', default='False')
 	parser.add_argument('--acc_list', help='csv file containing one accession per row, cannot be specied at the same time as --taxa', default='False')
+	parser.add_argument('--integron_finder', help=argparse.SUPPRESS, default='False')
 	args=parser.parse_args()
 
 	return args
@@ -891,7 +892,7 @@ def update():
 	file.endswith('.fna') and not '_orfs' in file]
 
 	#Create temporary directory
-	if args.integron_finder==True:
+	if args.integron_finder=='True':
 		if not os.path.exists(args.target_directory.rstrip('/')+'/update_tmp/integrons_tmp'):
 			os.mkdir(args.target_directory.rstrip('/')+'/update_tmp/integrons_tmp')
 
@@ -1271,7 +1272,7 @@ def annotate_orfs(queue):
 		if not os.path.exists(fa_file.replace('_orfs.fna', '_orfs_annotated.csv')):
 			diamond_call='diamond blastp -p 30 -d %s -q %s -o %s --id 60 --more-sensitive \
 			--max-target-seqs 1 --masking 0 --subject-cover 60 -f 6 qseqid sseqid stitle pident \
-			qstart qend qlen slen length qframe qtitle' % (os.path.dirname(args.target_directory).rstrip('/')+'/uniprotKB.dmnd', fa_file, fa_file.replace('_orfs.fna', '_orfs_annotated.csv'))
+			qstart qend qlen slen length qframe qtitle' % (args.target_directory.rstrip('/')+'/uniprotKB.dmnd', fa_file, fa_file.replace('_orfs.fna', '_orfs_annotated.csv'))
 			subprocess.call(diamond_call, shell=True)
 
 		if args.is_db==True:
@@ -1716,10 +1717,6 @@ def to_sql_db(env_dict, all_anno, target_directory):
 
 def main():
 
-	if args.erase==True:
-		erase_previous()
-
-
 	download_uniprot()
 
 	#Disable for debugging
@@ -1956,7 +1953,7 @@ def main():
 	args.target_directory) if file.startswith('flanking_regions_') and \
 	file.endswith('.fna') and not '_orfs' in file]
 
-	if args.integron_finder==True:
+	if args.integron_finder:
 		#Create temporary directory
 		if not os.path.exists(args.target_directory.rstrip('/')+'/integrons_tmp'):
 			os.mkdir(args.target_directory.rstrip('/')+'/integrons_tmp')
