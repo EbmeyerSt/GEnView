@@ -20,9 +20,9 @@ def parse_arguments():
 	parser.add_argument('-p', '--processes', help='of cores to run the script on', type=int, default=multiprocessing.cpu_count())
 	parser.add_argument('-id', '--identity', help='identity cutoff for hits to be saved to the database (e.g 80 for 80%% cutoff)', type=float, default=90)
 	parser.add_argument('-scov', '--subject_coverage', help='minimum coverage for a hit to be saved to db (e.g 80 for 80%% cutoff)', type=float, default=90)
-	parser.add_argument('--split', help='number of files to obtain for processing flanking regions', required=True, type=int)
-	parser.add_argument('--update', help='downloads new genomes and updates database', action='store_true')
-	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False)
+	parser.add_argument('--split', help='number of files to obtain for processing flanking regions, default=5', type=int, default=5)
+	parser.add_argument('--update', help=argparse.SUPPRESS, action='store_true')
+	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False, action='store_true')
 	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
@@ -32,6 +32,7 @@ def parse_arguments():
 	args=parser.parse_args()
 
 	return args
+
 
 def download_uniprot():
 
@@ -488,6 +489,8 @@ def download_plasmids():
 	#add lineage to plasmid entries
 	print('adding lineages to plasmids...')
 
+	sum_files=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
+	if file.startswith('plasmid_summary')]
 	new_lineages=add_taxonomy_lineages(sum_files)
 
 	#Go through refseq catalogue to extract all bacterial plasmids
@@ -1280,7 +1283,7 @@ def annotate_orfs(queue):
 			if not os.path.exists(fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv')):
 				IS_call='diamond blastp -p 30 -d %s -q %s -o %s --id 90 --more-sensitive \
 				--max-target-seqs 1 --masking 0 --subject-cover 90 -f 6 qseqid sseqid stitle pident \
-				qstart qend qlen slen length qframe qtitle' % (args.is_db, fa_file, fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv'))
+				qstart qend qlen slen length qframe qtitle' % (args.target_directory.rstrip("/")+"/is_db.dmnd", fa_file, fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv'))
 				subprocess.call(IS_call, shell=True)
 
 		fa_file=queue.get()
@@ -1953,7 +1956,7 @@ def main():
 	args.target_directory) if file.startswith('flanking_regions_') and \
 	file.endswith('.fna') and not '_orfs' in file]
 
-	if args.integron_finder:
+	if args.integron_finder=='True':
 		#Create temporary directory
 		if not os.path.exists(args.target_directory.rstrip('/')+'/integrons_tmp'):
 			os.mkdir(args.target_directory.rstrip('/')+'/integrons_tmp')
@@ -2046,7 +2049,12 @@ def transposon_table():
 if __name__=='__main__':
 
 	args=parse_arguments()
-	if args.taxa and args.acc_list!=False:
+
+	if args.update==True:
+		print('Update function is momentarily deprecated, exiting...')
+		sys.exit()
+
+	if args.taxa and args.acc_list!='False':
 		print('\n--taxa cannot be specified at the same time as --acc_list, please choose only one option\n')
 		sys.exit()
 

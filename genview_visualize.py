@@ -11,7 +11,7 @@ def parse_arguments():
 	parser.add_argument('-o', help='target directory', required=True)
 	parser.add_argument('--force', help='Force new alignment and phylogeny', action='store_true')
 	parser.add_argument('--compressed', help='Compress number of displayed sequences', action='store_true')
-	parser.add_argument('--all', help='Create visualizations for all gene analyses in directory', action='store_true')
+	parser.add_argument('--all', help=argparse.SUPPRESS, action='store_true')
 	args=parser.parse_args()
 
 	return args
