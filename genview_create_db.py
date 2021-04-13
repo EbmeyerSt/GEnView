@@ -33,7 +33,6 @@ def parse_arguments():
 
 	return args
 
-
 def download_uniprot():
 
 	#Check if gdown is installed
@@ -71,6 +70,15 @@ def download_uniprot():
 
 
 def reformat():
+
+	#Check that db contains amino acid seqs
+	db_lines=[line for line in open(args.database, 'r') if not line.startswith('>')]
+	letter_set={letter for line in db_lines for letter in line}
+
+	if len(letter_set)<12:
+		print(f'{args.database} does not look like it contains amino acid sequences, please provide an amino acid sequence database instead.\nexiting...')
+		sys.exit()
+
 
 	if not os.path.exists(args.database.replace(args.database.split('.')[-1], 'dmnd')):
 		print('Converting fasta to .dmnd database...')
@@ -1839,6 +1847,11 @@ def main():
 
 	#summarize all flanking regions into one temporary file
 	lines=[line for file in flank_files for line in open(file, 'r')]
+
+	#If no flanking regions were found, exit
+	if len(lines)==0:
+		print('No database matches found, exiting...')
+		sys.exit()
 
 	print('Writing temporary files...')
 	with open(args.target_directory.rstrip('/')+'/all_flanks.csv_tmp', 'w') as outfile:
