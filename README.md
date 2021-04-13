@@ -40,9 +40,9 @@ An example walk-through can be found in the wiki: https://github.com/EbmeyerSt/G
 ```
 usage: genview_create_db.py [-h] -d TARGET_DIRECTORY -db DATABASE
                            [-p PROCESSES] [-id IDENTITY] [--erase]
-                           [-scov SUBJECT_COVERAGE] -split SPLIT [--update]
+                           [-scov SUBJECT_COVERAGE] -split SPLIT
                            [--is_db IS_DB] [--taxa TAXA [TAXA ...]]
-                           [--assemblies] [--plasmids] [--integron_finder]
+                           [--assemblies] [--plasmids]
                            [--save_tmps]
 
 ________________________________________________________________________________
@@ -63,7 +63,6 @@ optional arguments:
   -scov SUBJECT_COVERAGE, --subject_coverage SUBJECT_COVERAGE
                         minimum coverage for a hit to be saved to db
   -split SPLIT          number of files to obtain for processing flanking regions
-  --update              downloads new genomes and updates database
   --is_db IS_DB         database containing IS, integrons, ISCR sequences
   --taxa TAXA [TAXA ...]
                         taxon/taxa names to download genomes for - use "all" do download all available genomes
@@ -116,7 +115,6 @@ optional arguments:
   -o O          target directory
   --force       Force new alignment and phylogeny
   --compressed  Compress number of displayed sequences
-  --all         Create visualizations for all gene analyses in directory
 
 ```
  specifying `--compressed` will cluster all sequences at 95% nucleotide identity and remove duplicates. Only the centroids of the resulting clusters will be visualized. 
