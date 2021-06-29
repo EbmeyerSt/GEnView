@@ -135,6 +135,14 @@ def read_db(context_file):
 			value2['seq']=seq_dict[key][value2['env_start']:value2['env_stop']+1]
 
 	#Write annotation metadata
+
+	#Create keyword lists to set gene color
+	tnps=['iscr', 'transpos', 'tnp', 'insertion']
+	ints=['inti', 'integrase', 'xerc', 'xerd']
+	mobiles=['secretion', 'mobiliza', 'moba', 'mobb', 'mobc', 'mobl', 'plasmid', 'relaxase',\
+		'conjugation', 'type iv']
+	res=['lactam', 'aminoglyco', 'fluoroquinolo', 'tetracyclin', 'macrolid', 'carbapenem']
+
 	with open(args.o.rstrip('/')+'/'+'annotation_meta.csv', 'w') as outfile:
 		
 		#To sort genes in right order in annotation metafile, create list of gene starts and stops
@@ -153,11 +161,33 @@ def read_db(context_file):
 
 			#Now write genes to the list, in the same order as they are in the list
 			lines.append(gene_dict[key]['name']+'\t'+str(gene_dict[key]['start'])+'\t'+\
-			str(gene_dict[key]['stop'])+'\t'+gene_dict[key]['seq']+'\n')
+			str(gene_dict[key]['stop'])+'\t'+gene_dict[key]['seq']+'\ttarget\n')
 
 			for key2, value2 in value['env_genes'].items():
+
+				#add group (e.g transposon,integron, etc.)
+				group_assigned=0
+				if any(keyword.lower() in value2['env_name'].lower() for keyword in tnps):
+					group='transposase'
+					group_assigned=1
+				if any(keyword.lower() in value2['env_name'].lower() for keyword in ints):
+					group='integron'
+					group_assigned=1
+				if any(keyword.lower() in value2['env_name'].lower() for keyword in mobiles):
+					group='mobile'
+					group_assigned=1
+				if any(keyword.lower() in value2['env_name'].lower() for keyword in res):
+					group='resistance'
+					group_assigned=1
+				if 'hypothetical' in value2['env_name'].lower():
+						group='hypothetical'
+						group_assigned=1
+
+				if not group_assigned==1:
+					group='misc'
+
 				lines.append(value2['env_name']+'\t'+str(value2['env_start'])+'\t'+\
-				str(value2['env_stop'])+'\t'+value2['env_strand']+'\t'+value2['seq']+'\n')
+				str(value2['env_stop'])+'\t'+value2['env_strand']+'\t'+value2['seq']+'\t'+group+'\n')
 
 			for element in sorted_pos:
 				for line in lines:
