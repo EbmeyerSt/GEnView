@@ -119,11 +119,32 @@ optional arguments:
 ```
  specifying `--compressed` will cluster all sequences at 95% nucleotide identity and remove duplicates. Only the centroids of the resulting clusters will be visualized. 
 
+ `genview_html_output.py` uses the generated Tree and visualization_meta.csv file to generate a HTML file that contains a phylogenetic tree and each extracted sequence with its respective genetic elements.
+
+ ```
+ usage: genview_html_output.py [-h] -i -t -o
+
+________________________________________________________________________________
+
+Interactive visualization and annotation of genes and genetic environments
+________________________________________________________________________________
+
+optional arguments:
+  -h, --help    show this help message and exit
+  -i            Input file containing gene meta information
+  -t            Tree file
+  -o            Output directory
+
+ ```
+ Note that the output file was tested on Google Chrome and may not function properly when opened in other web browsers.
+
 # Output files
 
 The following output files will be produced in the specified output directory when running `visualize.py`:
 
 **annotation_meta.csv** - Contains information on annotated genes in the extracted range of the target gene, such as name, position and sequence
+
+**visualization_meta.csv** - Contains information on annotated genes in the extracted range of the target gene, such as name, position and sequence in a format used for creation of the interactive HTML visualization output file.
 
 **yourgenename_contexts._tree_annotated.pdf** - PDF containing a phylogeny based visualization of the target genes genetic environment
 
@@ -134,3 +155,5 @@ The following output files will be produced in the specified output directory wh
 **yourgenename_contexts.unique.aln** Alignment of unique extracted sequences
 
 **yourgenename_contexts.unique.tree** Tree file created by FastTree2
+
+**yourgenename_interactive_output.html** Interactive visualization of tree and extracted sequence (target gene+genetic environemnt). Viewed in web browser (Google Chrome).
