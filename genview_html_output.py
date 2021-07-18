@@ -1,4 +1,4 @@
-#!/usr/local/env python3.7
+#!/usr/local/env python3.9
 import os, csv, math
 from argparse import RawTextHelpFormatter
 
@@ -369,14 +369,14 @@ def create_tree_index(tree_file_path):
     return new_tree
 
 
-def create_html(tree_index):
-    #Create string of phylogenetic tree HTML
+def create_tree_lines(tree_index, y_val, size, width=300):
+   #Create string of phylogenetic tree HTML
     tree_string = ''
-    x_sep = round(300/len(final_tree[0][1:]),2)
+    x_sep = round(width/len(final_tree[0][1:]),2)
 
-    tree_string += '<svg class="tree l_tree" width="300" height="12000">'
+    tree_string += '<svg class="tree '+ size +'" width="'+ str(width) +'" height="12000">'
     #Get horizontal lines
-    y = 17
+    y = y_val + 1
     for row in final_tree[1:-1]:
         x1 = 0
         x2 = 0
@@ -392,7 +392,7 @@ def create_html(tree_index):
                 tree_string += '<line class="hor" x1="'+ str(x1) +'" y1="'+ str(y) +'" x2="'+ str(x2) +'" y2="'+ str(y) +'" stroke="black" stroke-width="1"/>'
             xval += x_sep
             i += 1
-        y += 16
+        y += y_val
 
     #get vertical lines
     i = 1
@@ -400,7 +400,7 @@ def create_html(tree_index):
     while i < len(final_tree[0]):
         y1 = 0
         y2 = 0
-        y = 17
+        y = y_val + 1
         k = 1    
         while k < (len(final_tree)-1):
             if final_tree[k][i] == 1 and final_tree[k+1][i] == 1 and final_tree[k-1][i] == 0:
@@ -410,96 +410,18 @@ def create_html(tree_index):
                 if y1 > 0 and y2 > 0:
                     tree_string += '<line class="ver" x1="'+ str(xval) +'" y1="'+ str(y1) +'" x2="'+ str(xval) +'" y2="'+ str(y2) +'"/>'
             k += 1    
-            y += 16        
+            y += y_val      
         xval += x_sep
         i += 1
     tree_string += '</svg>'
+    return tree_string
 
-
-    tree_string += '<svg class="tree m_tree hidden" width="300" height="6000">'
-        #Get horizontal lines
-    y = 10
-    for row in final_tree[1:-1]:
-        x1 = 0
-        x2 = 0
-        xval = 0
-        i = 1
-        while i < len(row):
-            n = i + 1
-            p = i - 1
-            if row[i] == 1 and row[n] == 1 and row[p] == 0:
-                x1 = xval
-            elif row[i] == 1 and row[n] == 0 and row[p] == 1:
-                x2 = xval
-                tree_string += '<line class="hor" x1="'+ str(x1) +'" y1="'+ str(y) +'" x2="'+ str(x2) +'" y2="'+ str(y) +'" stroke="black" stroke-width="1"/>'
-            xval += x_sep
-            i += 1
-        y += 9
-    #get vertical lines
-    i = 1
-    xval = 0
-    while i < len(final_tree[0]):
-        y1 = 0
-        y2 = 0
-        y = 10
-        k = 1
-        while k < (len(final_tree)-1):
-            p = k - 1
-            n = k + 1
-            if final_tree[k][i] == 1 and final_tree[n][i] == 1 and final_tree[p][i] == 0:
-                y1 = y
-            elif final_tree[k][i] == 1 and final_tree[n][i] == 0 and final_tree[p][i] == 1:
-                y2 = y
-                if y1 > 0 and y2 > 0:
-                    tree_string += '<line class="ver" x1="'+ str(xval) +'" y1="'+ str(y1) +'" x2="'+ str(xval) +'" y2="'+ str(y2) +'"/>'
-            k += 1    
-            y += 9       
-        xval += x_sep
-        i += 1
-    tree_string += '</svg>'
-
-
-    tree_string += '<svg class="tree s_tree hidden" width="300" height="3000">'
-        #Get horizontal lines
-    y = 5
-    for row in final_tree[1:-1]:
-        x1 = 0
-        x2 = 0
-        xval = 0
-        i = 1
-        while i < len(row):
-            n = i + 1
-            p = i - 1
-            if row[i] == 1 and row[n] == 1 and row[p] == 0:
-                x1 = xval
-            elif row[i] == 1 and row[n] == 0 and row[p] == 1:
-                x2 = xval
-                tree_string += '<line class="hor" x1="'+ str(x1) +'" y1="'+ str(y) +'" x2="'+ str(x2) +'" y2="'+ str(y) +'" stroke="black" stroke-width="1"/>'
-            xval += x_sep
-            i += 1
-        y += 4
-    #get vertical lines
-    i = 1
-    xval = 0
-    while i < len(final_tree[0]):
-        y1 = 0
-        y2 = 0
-        y = 5
-        k = 1
-        while k < (len(final_tree)-1):
-            p = k - 1
-            n = k + 1
-            if final_tree[k][i] == 1 and final_tree[n][i] == 1 and final_tree[p][i] == 0:
-                y1 = y
-            elif final_tree[k][i] == 1 and final_tree[n][i] == 0 and final_tree[p][i] == 1:
-                y2 = y
-                if y1 > 0 and y2 > 0:
-                    tree_string += '<line class="ver" x1="'+ str(xval) +'" y1="'+ str(y1) +'" x2="'+ str(xval) +'" y2="'+ str(y2) +'"/>'
-            k += 1    
-            y += 4    
-        xval += x_sep
-        i += 1
-    tree_string += '</svg>'
+def create_html(tree_index): 
+    #Create Phylo Tree
+    tree_string = ''
+    tree_string += create_tree_lines(tree_index, 16, 'l_tree')
+    tree_string += create_tree_lines(tree_index, 9, 'm_tree')
+    tree_string += create_tree_lines(tree_index, 4, 's_tree')
 
     #Get max sequence length
     with open(meta_data_path, newline = '') as org_file:
