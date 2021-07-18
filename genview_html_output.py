@@ -3,13 +3,13 @@ import os, csv, math
 from argparse import RawTextHelpFormatter
 
 def parse_arguments():
-	descr='\nHTML Interactive visualization and annotation of genes and genetic environments\n'
-	parser=argparse.ArgumentParser(description=descr.replace("'", ''), formatter_class=RawTextHelpFormatter)
-	parser.add_argument('-i', help='Input vizualization_meta.csv file', required=True)
+    descr='\nHTML Interactive visualization and annotation of genes and genetic environments\n'
+    parser=argparse.ArgumentParser(description=descr.replace("'", ''), formatter_class=RawTextHelpFormatter)
+    parser.add_argument('-i', help='Input vizualization_meta.csv file', required=True)
     parser.add_argument('-t', help='Phylogenetic tree file in Newik or Tree format', required=True)
-	parser.add_argument('-o', help='Output directory', required=True)
-	args=parser.parse_args()
-	return args
+    parser.add_argument('-o', help='Output directory', required=True)
+    args=parser.parse_args()
+    return args
 
 
 path = 'C:/Users/xcoero/Documents/Projects/scripts/GEnView/'
@@ -985,5 +985,5 @@ def main():
 
 
 if __name__=='__main__':
-	args=parse_arguments()
+    args=parse_arguments()
     main()
