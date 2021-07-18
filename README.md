@@ -3,7 +3,7 @@ A phylogeny based comparative genomics software to analyze the genetic environme
 
 # Installation
 
-GEnView consists of three main scripts - genview_create_db.py, genview_extract.py and genview_visualize.py
+GEnView consists of four main scripts - genview_create_db.py, genview_extract.py, genview_visualize.py and genview_html_output.py
 
 The code can be downloaded simply through cloning the git repository:
 
