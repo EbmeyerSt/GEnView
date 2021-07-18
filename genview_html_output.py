@@ -1,22 +1,22 @@
-#!/usr/local/env python3.9
-import os, csv, math
+#!/usr/local/env python3.7
+import os, csv, math, argparse
 from argparse import RawTextHelpFormatter
 
 def parse_arguments():
     descr='\nHTML Interactive visualization and annotation of genes and genetic environments\n'
     parser=argparse.ArgumentParser(description=descr.replace("'", ''), formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-i', help='Input vizualization_meta.csv file', required=True)
-    parser.add_argument('-t', help='Phylogenetic tree file in Newik or Tree format', required=True)
-    parser.add_argument('-o', help='Output directory', required=True)
+    parser.add_argument('-i', '--input', help='Input vizualization_meta.csv file', required=True)
+    parser.add_argument('-t', '--tree', help='Phylogenetic tree file in Newik or Tree format', required=True)
+    parser.add_argument('-o', '--output', help='Output directory', required=True)
     args=parser.parse_args()
     return args
 
 
-path = 'C:/Users/xcoero/Documents/Projects/scripts/GEnView/'
-os.chdir(path)
+#path = 'C:/Users/xcoero/Documents/Projects/scripts/GEnView/'
+#os.chdir(path)
 
-meta_data_path = "visualization_meta.csv"
-tree_file_path = "iscr_contexts.unique.txt"
+#meta_data_path = "visualization_meta.csv"
+#tree_file_path = "iscr_contexts.unique.txt"
 
 #Create a text index file of the phylogenetic tree
 def make_text(final_tree):
