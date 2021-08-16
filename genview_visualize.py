@@ -194,9 +194,7 @@ def read_db(context_file):
 				str(value2['env_stop'])+'\t'+value2['env_strand']+'\t'+value2['seq']+'\t'+group+'\n')
 
 				#Vis list
-				vis_list.append([str(key), gene_dict[key]['name'], gene_dict[key]['organism'],/
-				gene_dict[key]['assembly'], (value2['env_name'], value2['env_start'],/
-				value2['env_stop'], value2['env_strand'], group, value2['seq']])
+				vis_list.append([str(key), gene_dict[key]['name'], gene_dict[key]['organism'], gene_dict[key]['assembly'], value2['env_name'], value2['env_start'], value2['env_stop'], value2['env_strand'], group, value2['seq']])
 
 			for element in sorted_pos:
 				for line in lines:

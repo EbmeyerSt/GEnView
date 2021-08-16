@@ -131,12 +131,12 @@ ________________________________________________________________________________
 
 optional arguments:
   -h, --help    show this help message and exit
-  -i            Input file containing gene meta information
-  -t            Tree file
-  -o            Output directory
+  -i, --input   Input file containing gene meta information
+  -t, --tree    Tree file
+  -o, --output  Output directory
 
  ```
- Note that the output file was tested on Google Chrome and may not function properly when opened in other web browsers.
+ Note that the output file was tested on Google Chrome (Version 91.0.4472.164) and Firefox (Version 90.0) and may not function properly when opened in older versions other web browsers.
 
 # Output files
 
@@ -156,4 +156,4 @@ The following output files will be produced in the specified output directory wh
 
 **yourgenename_contexts.unique.tree** Tree file created by FastTree2
 
-**yourgenename_interactive_output.html** Interactive visualization of tree and extracted sequence (target gene+genetic environment). Viewed in web browser (Google Chrome).
+**interactive_output.html** Interactive visualization of tree and extracted sequence (target gene+genetic environment). Viewed in web browser (Google Chrome 91.0.4472.164 and Firefox 90.0).

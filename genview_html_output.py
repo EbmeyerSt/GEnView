@@ -5,9 +5,9 @@ from argparse import RawTextHelpFormatter
 def parse_arguments():
     descr='\nHTML Interactive visualization and annotation of genes and genetic environments\n'
     parser=argparse.ArgumentParser(description=descr.replace("'", ''), formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-i', '--input', help='Input vizualization_meta.csv file', required=True)
-    parser.add_argument('-t', '--tree', help='Phylogenetic tree file in Newik or Tree format', required=True)
-    parser.add_argument('-o', '--output', help='Output directory', required=True)
+    parser.add_argument('-i', '--input', help='Input visualization_meta.csv file', required=True)
+    parser.add_argument('-t', '--tree', help='Phylogenetic input tree file in Newik or Tree format', required=True)
+    parser.add_argument('-o', '--output', help='Output directory. If not specified the visualization_meta.csv file directory will be used.')
     args=parser.parse_args()
     return args
 
@@ -373,8 +373,9 @@ def create_tree_lines(tree_index, y_val, size, width=300):
    #Create string of phylogenetic tree HTML
     tree_string = ''
     x_sep = round(width/len(final_tree[0][1:]),2)
-
-    tree_string += '<svg class="tree '+ size +'" width="'+ str(width) +'" height="12000">'
+    #Calculate height ==== 
+    height = len(final_tree)*y_val + y_val
+    tree_string += '<svg class="tree '+ size +'" width="'+ str(width) +'" height="'+ height +'">'
     #Get horizontal lines
     y = y_val + 1
     for row in final_tree[1:-1]:
@@ -433,6 +434,7 @@ def create_html(tree_index):
 
                 
     factor = 1000/max(values)
+
     name = False
     header = ""
     start_next = ""
@@ -505,7 +507,7 @@ def create_html(tree_index):
                             string += '<div class="AL left" id="'+ str(id) +'_gene_arrow" style="grid-column: '+ str(start) +' / '+ str(start) +';grid-row: 1 / 5;--my-color-var: '+ color +';opacity: 0.7;"></div>'
                             string += '<div id="'+ str(id) +'_gene" class="L all" style="grid-column: '+ str(start) +' / '+ str(end) +';grid-row: 1 / 5;background-color: '+ color +';margin-left: 15px;opacity: 0.7;"><p></p></div>'
 
-                        string += '<div id="'+ str(id) +'_gene_info" class="hidden info_box"><button class="exit">X</button><p><strong>Organism:</strong> Citrobacter farmeri</p><p><strong>Accession:</strong> H23409823.1</p><p><strong>Gene:</strong> '+ row[0] +'</p><p><strong>Start:</strong> '+ str(row[1]) +'</p><p><strong>End:</strong> '+ str(row[2]) +'</p><textarea id="'+ str(id) +'_gene_sequence">'+ header +'&#13;&#10;'+ row[4] +'</textarea><button class="copy btn" onclick="copy_to_clipboard("'+ str(id) +'_gene_sequence");">Copy</button></div>'           
+                        string += '<div id="'+ str(id) +'_gene_info" class="hidden info_box"><button class="exit">X</button><p><strong>Organism:</strong> Citrobacter farmeri</p><p><strong>Accession:</strong> H23409823.1</p><p><strong>Gene:</strong> '+ row[0] +'</p><p><strong>Start:</strong> '+ str(row[1]) +'</p><p><strong>End:</strong> '+ str(row[2]) +'</p><textarea id="'+ str(id) +'_gene_sequence">'+ header +'&#13;&#10;'+ row[4] +'</textarea><button id="'+ str(id) +'" class="copy btn";">Copy</button></div>'           
                 id += 1   
         string += '</div>'  
 
@@ -847,6 +849,9 @@ def create_html(tree_index):
         document.execCommand('copy');
     }
     $(document).on("click", ".copy", function() {
+        var id = $(this).getElementById();
+        var id = id + "_gene_sequence";
+        copy_to_clipboard(id)
         $('#statusmessage').text('Sequence copied to clipboard!').animate({'margin-top':0},200);
         setTimeout( function(){
             $('#statusmessage').animate({'margin-top':-25},200);
