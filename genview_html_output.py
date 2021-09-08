@@ -11,18 +11,11 @@ def parse_arguments():
     args=parser.parse_args()
     return args
 
-
-#path = 'C:/Users/xcoero/Documents/Projects/scripts/GEnView/'
-#os.chdir(path)
-
-#meta_data_path = "visualization_meta.csv"
-#tree_file_path = "iscr_contexts.unique.txt"
-
 #Create a text index file of the phylogenetic tree
 def make_text(final_tree):
-    if os.path.exists("index_tree.txt"):
-        os.remove("index_tree.txt")
-    f = open("index_tree.txt", "a")
+    if os.path.exists(args.output + "/index_tree.txt"):
+        os.remove(args.output + "/index_tree.txt")
+    f = open(args.output + "/index_tree.txt", "a")
     for row in final_tree:
         f.write(str(row))
         f.write('\n')
@@ -315,42 +308,6 @@ def create_tree_index(tree_file_path):
                             k += 1
             cur_row += 1
         mx -= 1
-
-    #Vertically connect horizontal lines
-    # i = 1
-    # while i < len(new_tree[0]):
-    #     n = 0
-    #     while n < len(new_tree[1:-1]):
-    #         if new_tree[n][i] == 1 and new_tree[n][i-1] == 0:
-    #             parent = new_tree[n][0].strip('-')
-    #             parent = get_parent(parent)                
-    #             cur = new_tree[n][0]
-    #             cur = cur.strip('-')
-    #             ll = int(get_last_letter(cur))
-    #             number = 0
-    #             while True:
-    #                 ll += 1
-    #                 tmp = parent + '.' + str(ll)
-    #                 cont = False
-    #                 for branch in new_tree[1:-1]:
-    #                     if branch[0].strip('-') == tmp:
-    #                         number += 1
-    #                         cont = True
-    #                 if cont == False:
-    #                     break
-    #             ll = int(get_last_letter(cur)) + 1
-    #             while True:
-    #                 if number == 0:
-    #                     break
-    #                 else:
-    #                     tmp = parent + '.' + str(ll)
-    #                     new_tree[n][i] = 1
-    #                     if new_tree[n][0].strip('-') == tmp:
-    #                         number -= 1
-    #                         ll += 1
-    #                     n += 1
-    #         n += 1
-    #     i += 1
             
     #Add stipple lines to nodes
     i = 1
@@ -425,7 +382,7 @@ def create_html(tree_index):
     tree_string += create_tree_lines(tree_index, 4, 's_tree')
 
     #Get max sequence length
-    with open(meta_data_path, newline = '') as org_file:
+    with open(args.input, newline = '') as org_file:
         reader = csv.reader(org_file, delimiter='\t')
         values = []
         for row in reader:
@@ -982,13 +939,15 @@ def write_output(output, output_dir):
 
 def main():
     #Create index phylogenetic tree file
-    final_tree = create_tree_index(tree_file_path)
+    final_tree = create_tree_index(args.tree)
     #Create html of phylogenetic tree and corresponding sequences
     output = create_html(final_tree)
     #Write HTML output file
-    write_output(output, output_dir)
+    write_output(output, args.output)
 
 
 if __name__=='__main__':
     args=parse_arguments()
+    if not args.output:
+        args.output = os.path.dirname(args.input)
     main()
