@@ -143,6 +143,9 @@ def read_db(context_file):
 		'conjugation', 'type iv']
 	res=['lactam', 'aminoglyco', 'fluoroquinolo', 'tetracyclin', 'macrolid', 'carbapenem']
 
+	#Create list header for tmp visualization file
+	vis_list = [['key', 'name', 'organism', 'assembly', 'gene', 'start', 'stop', 'direction', 'group', 'sequence']]
+
 	with open(args.o.rstrip('/')+'/'+'annotation_meta.csv', 'w') as outfile:
 		
 		#To sort genes in right order in annotation metafile, create list of gene starts and stops
@@ -151,6 +154,7 @@ def read_db(context_file):
 			outfile.write('_'*20+'\n'+gene_dict[key]['name']+'__'+str(key)+'__'+gene_dict[key]['organism']+\
 			'__'+gene_dict[key]['assembly']+'\n'+'-'*20+'\n'
 			)
+
 			position_list=[]
 			lines=[]
 			position_list.append(gene_dict[key]['start']+gene_dict[key]['stop'])
@@ -189,11 +193,19 @@ def read_db(context_file):
 				lines.append(value2['env_name']+'\t'+str(value2['env_start'])+'\t'+\
 				str(value2['env_stop'])+'\t'+value2['env_strand']+'\t'+value2['seq']+'\t'+group+'\n')
 
+				#Vis list
+				vis_list.append([str(key), gene_dict[key]['name'], gene_dict[key]['organism'], gene_dict[key]['assembly'], value2['env_name'], value2['env_start'], value2['env_stop'], value2['env_strand'], group, value2['seq']])
+
 			for element in sorted_pos:
 				for line in lines:
 					if int(element)==int(line.split('\t')[1])+\
 					int(line.split('\t')[2]):
 						outfile.write(line)
+	
+	#Create tmp file for visualization
+	with open(args.o.rstrip('/')+'/'+'visualization_meta.csv', 'w') as outfile:
+		write = csv.writer(outfile) 
+		write.writerows(vis_list) 
 
 	return gene_dict
 
