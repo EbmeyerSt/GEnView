@@ -23,7 +23,7 @@ def parse_arguments():
 	parser.add_argument('--split', help='number of files to obtain for processing flanking regions, default=5', type=int, default=5)
 	parser.add_argument('--update', help=argparse.SUPPRESS, action='store_true')
 	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False, action='store_true')
-	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+')
+	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+', default='False')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
 	parser.add_argument('--save_tmps', help='keep temporary files', action='store_true', default='False')
@@ -2062,12 +2062,15 @@ def transposon_table():
 if __name__=='__main__':
 
 	args=parse_arguments()
+	if args.taxa=='False' and args.acc_list=='False':
+		print('No genomes specified for analysis, please specify either "--acc_list" or "" --taxa')
+		sys.exit()
 
 	if args.update==True:
 		print('Update function is momentarily deprecated, exiting...')
 		sys.exit()
 
-	if args.taxa and args.acc_list!='False':
+	if args.taxa!='False' and args.acc_list!='False':
 		print('\n--taxa cannot be specified at the same time as --acc_list, please choose only one option\n')
 		sys.exit()
 
