@@ -26,7 +26,7 @@ def parse_arguments():
 	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
-	parser.add_argument('--custom', help='Search custom genomes', action='store_true', default='False')
+	parser.add_argument('--custom', help='Search custom genomes', action='store_true', default=False)
 	parser.add_argument('--save_tmps', help='keep temporary files', action='store_true', default='False')
 	parser.add_argument('--acc_list', help='csv file containing one accession per row, cannot be specied at the same time as --taxa', default='False')
 	parser.add_argument('--integron_finder', help=argparse.SUPPRESS, default='False')
@@ -1111,10 +1111,7 @@ def create_db(queue):
 		seq_dict={}
 		#Parse genome .csv files
 		for line in open(fa_file.replace(ending, 'csv'), 'r'):
-			if args.custom:
-				acc = line.split('\t')[0].lstrip('>')
-			else:
-				acc = line.split(' ')[0].lstrip('>')
+			acc = line.split('\t')[0].split(' ')[0].lstrip('>')
 			if acc in arg_assemblies:
 				print('')
 				#Create a dictionary containing just the contigs with annotated genes
