@@ -3,7 +3,7 @@ A phylogeny based comparative genomics software to analyze the genetic environme
 
 # Installation
 
-GEnView consists of three main scripts - genview_create_db.py, genview_extract.py and genview_visualize.py
+GEnView consists of four main scripts - genview_create_db.py, genview_extract.py, genview_visualize.py and genview_html_output.py
 
 The code can be downloaded simply through cloning the git repository:
 
@@ -119,6 +119,28 @@ optional arguments:
 ```
  specifying `--compressed` will cluster all sequences at 95% nucleotide identity and remove duplicates. Only the centroids of the resulting clusters will be visualized. 
 
+
+
+ `genview_html_output.py` uses the generated Tree and visualization_meta.csv file to generate a HTML file that contains a phylogenetic tree and each extracted sequence with its respective genetic elements.
+
+ ```
+ usage: genview_html_output.py [-h] -i -t -o
+
+________________________________________________________________________________
+
+Interactive visualization and annotation of genes and genetic environments
+________________________________________________________________________________
+
+optional arguments:
+  -h, --help    show this help message and exit
+  -i, --input   Input file containing gene meta information
+  -t, --tree    Tree file
+  -o, --output  Output directory
+
+ ```
+ Note that the output file was tested on Google Chrome (Version 91.0.4472.164) and Firefox (Version 90.0) and may not function properly when opened in older versions other web browsers.
+
+
 ## Custom genomes or contigs
 
 It is possible to use GEnView with custom genomes and/or contigs. To do so, the parameter `--custom` must be specified and the genomes/contigs to be used must be placed in the target directory in a file named **all_assemblies.fna**.
@@ -131,6 +153,8 @@ The following output files will be produced in the specified output directory wh
 
 **annotation_meta.csv** - Contains information on annotated genes in the extracted range of the target gene, such as name, position and sequence
 
+**visualization_meta.csv** - Contains information on annotated genes in the extracted range of the target gene, such as name, position and sequence in a format used for creation of the interactive HTML visualization output file.
+
 **yourgenename_contexts._tree_annotated.pdf** - PDF containing a phylogeny based visualization of the target genes genetic environment
 
 **yourgenename_contexts.fna** - FASTA file containing extracted sequence (target gene+genetic environment) for every genome
@@ -140,3 +164,5 @@ The following output files will be produced in the specified output directory wh
 **yourgenename_contexts.unique.aln** Alignment of unique extracted sequences
 
 **yourgenename_contexts.unique.tree** Tree file created by FastTree2
+
+**interactive_output.html** Interactive visualization of tree and extracted sequence (target gene+genetic environment). Viewed in web browser (Google Chrome 91.0.4472.164 and Firefox 90.0).
