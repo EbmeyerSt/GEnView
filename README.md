@@ -119,6 +119,8 @@ optional arguments:
 ```
  specifying `--compressed` will cluster all sequences at 95% nucleotide identity and remove duplicates. Only the centroids of the resulting clusters will be visualized. 
 
+
+
  `genview_html_output.py` uses the generated Tree and visualization_meta.csv file to generate a HTML file that contains a phylogenetic tree and each extracted sequence with its respective genetic elements.
 
  ```
@@ -137,6 +139,13 @@ optional arguments:
 
  ```
  Note that the output file was tested on Google Chrome (Version 91.0.4472.164) and Firefox (Version 90.0) and may not function properly when opened in older versions other web browsers.
+
+
+## Custom genomes or contigs
+
+It is possible to use GEnView with custom genomes and/or contigs. To do so, the parameter `--custom` must be specified and the genomes/contigs to be used must be placed in the target directory in a file named **all_assemblies.fna**.
+If you have taxonomical information of your sequences this can be provided in a file named **custom_summary.txt** which then also must be placed in the target directory. The format of the file should be tab separated with the columns: contigID, taxonomical ID, taxonomical name, custom information (e.g. country, site, time...).
+
 
 # Output files
 

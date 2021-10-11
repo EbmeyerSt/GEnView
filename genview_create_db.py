@@ -26,9 +26,11 @@ def parse_arguments():
 	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+', default='False')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
+	parser.add_argument('--custom', help='Search custom genomes', action='store_true', default=False)
 	parser.add_argument('--save_tmps', help='keep temporary files', action='store_true', default='False')
 	parser.add_argument('--acc_list', help='csv file containing one accession per row, cannot be specied at the same time as --taxa', default='False')
 	parser.add_argument('--integron_finder', help=argparse.SUPPRESS, default='False')
+	parser.add_argument('--flanking_length', help='Max length of flanking regions to annotate', type=int, default=10000)
 	args=parser.parse_args()
 
 	return args
@@ -279,6 +281,28 @@ def add_taxonomy_lineages(summary_files):
 
 			old_lines=[line for line in open(previous, 'r')]
 			tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
+
+	#Process custom summary
+	elif 'custom' in newest:
+		# check if summary file contains any information
+		with open(newest) as f:
+			lines = f.readlines()
+			# Iw we don't have any information, assign to cellular organism
+			if len(lines[1].split('\t'))<2:
+				taxid = 131567
+			else:
+				taxid = False
+		if not args.update==True:
+			if not taxid:
+				tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#')}
+			else:
+				tax_dict={line.split('\t')[0]:taxid for line in open(newest, 'r') if not line.startswith('#')}
+		else:
+			old_lines=[line for line in open(previous, 'r')]
+			if not taxid:
+				tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
+			else:
+				tax_dict={line.split('\t')[0]:taxid for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
 
 	#Create lineage dict
 	lin_dict={}
@@ -1049,6 +1073,33 @@ def create_db(queue):
 			if len(line)>1:
 				org_dict[line.split('\t')[0]]=line.split('\t')[1].rstrip('\n')+' plasmid'	
 
+	if args.custom==True:
+
+		if not 'org_dict' in locals():
+			org_dict={}
+
+		#Identify most recent custom_summary file
+		summary_files_cust=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
+		if file.startswith('custom_summary')]
+
+		newest_cust=sorted(summary_files_cust)[-1]
+
+		for line in open(newest_cust, 'r'):
+			if len(line)>1:
+				#Check how much information we have got in the custom summary
+				num_infos = len(line.split('\t'))
+				print('num infos {}'.format(num_infos))
+				print(line)
+				if num_infos>3:
+					info = line.split('\t')[2].rstrip('\n') + ' ' + line.split('\t')[3].rstrip('\n')
+				elif num_infos > 1:
+					info = line.split('\t')[2].rstrip('\n')
+				else:
+					info = 'Unknown'
+				org_dict[line.split('\t')[0]]=info
+
+		tax_lines_cust=[line for line in open(newest_cust, 'r') if not line.startswith('#')]
+
 	while True:
 		
 		ending=fa_file.split('.')[-1]
@@ -1060,10 +1111,11 @@ def create_db(queue):
 		seq_dict={}
 		#Parse genome .csv files
 		for line in open(fa_file.replace(ending, 'csv'), 'r'):
-			if line.split(' ')[0].lstrip('>') in arg_assemblies:
+			acc = line.split('\t')[0].split(' ')[0].lstrip('>')
+			if acc in arg_assemblies:
 				print('')
 				#Create a dictionary containing just the contigs with annotated genes
-				seq_dict[line.split(' ')[0].lstrip('>')]=line.split('\t')[1].rstrip('\n')
+				seq_dict[acc]=line.split('\t')[1].rstrip('\n')
 
 
 		#Go through annotated files and extract info
@@ -1094,6 +1146,7 @@ def create_db(queue):
 				align_start=line.split('\t')[4]
 				align_end=line.split('\t')[5]
 				genome_acc=line.split('\t')[12].split('__')[-1].rstrip('\n')
+				flank_length = args.flanking_length
 
 				if genome_acc.endswith('.fna'):
 					genome_acc=genome_acc.replace('.fna', '.1')
@@ -1106,24 +1159,24 @@ def create_db(queue):
 
 					#now extract seqs
 					#1.) Both upstream and downstream are longer than 10kb
-					if down_len>=10000 and up_len>=10000:
+					if down_len>=flank_length and up_len>=flank_length:
 						flanking_seq=\
-						seq_dict[contig_acc][int(align_end)-10000:\
-						int(align_start)+10000]
-						new_uplen=10000
-						new_downlen=10000
+						seq_dict[contig_acc][int(align_end)-flank_length:\
+						int(align_start)+flank_length]
+						new_uplen=flank_length
+						new_downlen=flank_length
 					#2.) Only upstream is longer than 10kb
-					elif down_len<10000 and up_len>=10000:
+					elif down_len<flank_length and up_len>=flank_length:
 						flanking_seq=\
-						seq_dict[contig_acc][:int(align_start)+10000]
-						new_uplen=10000
+						seq_dict[contig_acc][:int(align_start)+flank_length]
+						new_uplen=flank_length
 						new_downlen=down_len
 					#3.) Only downstream is longer than 10kb
-					elif down_len>=10000 and up_len<10000:
+					elif down_len>=flank_length and up_len<flank_length:
 						flanking_seq=\
-						seq_dict[contig_acc][int(align_end)-10000:]
+						seq_dict[contig_acc][int(align_end)-flank_length:]
 						new_uplen=up_len
-						new_downlen=10000
+						new_downlen=flank_length
 					#4.) Both are shorter than 10kb
 					else:
 						flanking_seq=\
@@ -1146,24 +1199,24 @@ def create_db(queue):
 
 					#now extract seqs
 					#1.) Both upstream and downstream are longer than 10kb
-					if down_len>=10000 and up_len>=10000:
+					if down_len>=flank_length and up_len>=flank_length:
 						flanking_seq=\
-						seq_dict[contig_acc][int(align_start)-10000:\
-						int(align_end)+10000]
-						new_uplen=10000
-						new_downlen=10000
+						seq_dict[contig_acc][int(align_start)-flank_length:\
+						int(align_end)+flank_length]
+						new_uplen=flank_length
+						new_downlen=flank_length
 					#2.) Only upstream is longer than 10kb
-					elif down_len<10000 and up_len>=10000:
+					elif down_len<flank_length and up_len>=flank_length:
 						flanking_seq=\
-						seq_dict[contig_acc][int(align_start)-10000:]
-						new_uplen=10000
+						seq_dict[contig_acc][int(align_start)-flank_length:]
+						new_uplen=flank_length
 						new_downlen=down_len
 					#3.) Only downstream is longer than 10kb
-					elif down_len>=10000 and up_len<10000:
+					elif down_len>=flank_length and up_len<flank_length:
 						flanking_seq=\
-						seq_dict[contig_acc][:int(align_end)+10000]
+						seq_dict[contig_acc][:int(align_end)+flank_length]
 						new_uplen=up_len
-						new_downlen=10000
+						new_downlen=flank_length
 					#4.) Both are shorter than 10kb
 					else:
 						flanking_seq=\
@@ -1183,6 +1236,12 @@ def create_db(queue):
 							if genome_acc in tax_line:
 								print('Identical assembly found!')
 								taxon=org_dict[tax_line.split('\t')[0]]
+					elif args.custom:
+						for tax_line in tax_lines_cust:
+							if genome_acc in tax_line:
+								print('Identical assembly found!')
+								taxon=org_dict[tax_line.split('\t')[0]]
+
 
 				
 
@@ -1629,6 +1688,15 @@ def to_sql_db(env_dict, all_anno, target_directory):
 
 			new_lineages=add_taxonomy_lineages(summary_files)
 
+		if args.custom==True:
+
+			summary_files=[args.target_directory.rstrip('/')+'/'+file for \
+			file in os.listdir(args.target_directory) \
+			if file.startswith('custom_summary')]
+
+
+			new_lineages=add_taxonomy_lineages(summary_files)
+
 
 		create_genomes_table="""
 		CREATE TABLE IF NOT EXISTS genomes(
@@ -1820,6 +1888,10 @@ def main():
 	if not os.path.isfile(args.target_directory.rstrip('/')+'/all_assemblies.fna') \
 	or len(split_files)==0:
 		concatenate_and_split()	
+	
+	#If no custom summary file exist, create one with the genome/contig IDs
+	if args.custom and not os.path.isfile(args.target_directory.rstrip('/') + '/custom_summary.txt'):
+		create_simple_summary_file()
 
 	print('collecting fasta files for annotation...')
 	#Create list of files containing assemblies in fasta format
@@ -2057,7 +2129,10 @@ def transposon_table():
 	connection.commit()
 	print('Arg/transposon associations saved to db!')
 
-
+def create_simple_summary_file():
+	grep_command = "sed -n 's/>//p' {}/all_assemblies.fna > {}/custom_summary.txt".format(
+			args.target_directory,args.target_directory)
+	subprocess.call(grep_command,shell=True)
 
 if __name__=='__main__':
 
