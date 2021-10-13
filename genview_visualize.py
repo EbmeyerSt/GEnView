@@ -1,6 +1,6 @@
 #!/usr/local/env python3.7
 
-import sys, os, subprocess, argparse, ete3, sqlite3, timeit
+import sys, os, subprocess, argparse, ete3, sqlite3, timeit, csv
 from argparse import RawTextHelpFormatter
 from ete3 import SeqMotifFace, TreeStyle, add_face_to_node, Tree, NodeStyle, TextFace, COLOR_SCHEMES, SVG_COLORS, random_color
 
