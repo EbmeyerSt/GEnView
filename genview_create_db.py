@@ -1801,6 +1801,10 @@ def main():
 	#Disable for debugging
 	args.db=reformat()
 
+	#Create output directory if not exists
+	if not os.path.exists(args.target_directory):
+		os.mkdir(args.target_directory)
+
 	#Download NCBI taxonomy files for lineage assignment
 	if not os.path.exists(args.target_directory.rstrip('/')+'/taxonomy'):
 		os.mkdir(args.target_directory.rstrip('/')+'/taxonomy')
