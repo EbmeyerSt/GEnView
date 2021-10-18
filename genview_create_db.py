@@ -537,7 +537,6 @@ def download_plasmids():
 	for line in bacterial_plasmids:
 		refseq_dict[line.split('\t')[2]]=line.split('\t')[0]
 		
-
 	#add taxon to plasmid entries
 	new_plasmid_dict={}
 
