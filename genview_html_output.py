@@ -85,8 +85,7 @@ def create_tree_index(tree_file_path):
                             id_ext += 1
                         else:
                             current_id = tmp_id
-                            break    
-
+                            break   
                     if len(used_ids) == 0:
                         final_tree.append([current_id])
                     else:
@@ -329,13 +328,16 @@ def create_tree_index(tree_file_path):
 def create_tree_lines(tree_index, y_val, size, width=300):
    #Create string of phylogenetic tree HTML
     tree_string = ''
-    x_sep = round(width/len(final_tree[0][1:]),2)
+    x_sep = round(width/len(tree_index[0][1:]),2)
     #Calculate height ==== 
-    height = len(final_tree)*y_val + y_val
-    tree_string += '<svg class="tree '+ size +'" width="'+ str(width) +'" height="'+ height +'">'
+    height = len(tree_index)*y_val + y_val
+    if size == "l_tree":
+        tree_string += '<svg class="tree '+ size +'" width="'+ str(width) +'" height="'+ str(height) +'">'
+    else:
+        tree_string += '<svg class="hidden tree '+ size +'" width="'+ str(width) +'" height="'+ str(height) +'">'    
     #Get horizontal lines
     y = y_val + 1
-    for row in final_tree[1:-1]:
+    for row in tree_index[1:-1]:
         x1 = 0
         x2 = 0
         xval = 0
@@ -355,15 +357,15 @@ def create_tree_lines(tree_index, y_val, size, width=300):
     #get vertical lines
     i = 1
     xval = 0
-    while i < len(final_tree[0]):
+    while i < len(tree_index[0]):
         y1 = 0
         y2 = 0
         y = y_val + 1
         k = 1    
-        while k < (len(final_tree)-1):
-            if final_tree[k][i] == 1 and final_tree[k+1][i] == 1 and final_tree[k-1][i] == 0:
+        while k < (len(tree_index)-1):
+            if tree_index[k][i] == 1 and tree_index[k+1][i] == 1 and tree_index[k-1][i] == 0:
                 y1 = y
-            elif final_tree[k][i] == 1 and final_tree[k+1][i] == 0 and final_tree[k-1][i] == 1:
+            elif tree_index[k][i] == 1 and tree_index[k+1][i] == 0 and tree_index[k-1][i] == 1:
                 y2 = y
                 if y1 > 0 and y2 > 0:
                     tree_string += '<line class="ver" x1="'+ str(xval) +'" y1="'+ str(y1) +'" x2="'+ str(xval) +'" y2="'+ str(y2) +'"/>'
@@ -383,89 +385,97 @@ def create_html(tree_index):
 
     #Get max sequence length
     with open(args.input, newline = '') as org_file:
-        reader = csv.reader(org_file, delimiter='\t')
+        reader = list(csv.reader(org_file))[1:]
         values = []
+        org = []
+        key = 1
         for row in reader:
-            if len(row) > 1:
-                values.append(int(row[2]))
+            if key == int(row[0]):
+                org.append([int(row[0]), int(row[6])])                
+            else:
+                key += 1
+                values.append(org)
+                org = []
+                org.append([int(row[0]), int(row[6])]) 
+        values.append(org)
+    #Get max sequence length and max length of each organism
+    vals = []
+    final = []
+    tmp_vals = []
+    key = 1
+    for item in values:
+        for i in item:
+            vals.append(i[1])
+            if key == int(i[0]):
+                tmp_vals.append(i[1])
+            else:
+                final.append([int(i[0])-1, max(tmp_vals)])
+                tmp_vals = []
+                key += 1
+                tmp_vals.append(i[1])
+    final.append([int(i[0]), max(tmp_vals)])
 
-                
-    factor = 1000/max(values)
-
-    name = False
-    header = ""
-    start_next = ""
-    string = ""
-    run = 0
-    id = 0
-    x = True
+    factor = 1000/max(vals)
 
     tnps=['iscr', 'transpos', 'tnp', 'insertion']
     ints=['inti', 'integrase', 'xerc', 'xerd']
     mobiles=['secretion', 'mobiliza', 'moba', 'mobb', 'mobc', 'mobl', 'plasmid', 'relaxase', 'conjugation', 'type iv']
     res=['lactam', 'aminoglyco', 'fluoroquinolo', 'tetracyclin', 'macrolid', 'carbapenem']
 
-    line_no = 2
-    line_no_2 = line_no + 2
-    gene_no_row_2 = 1
+    string = ""
     string += '<div class="sequences" style="grid-column-start: 2; grid-column-end: 3;grid-row-start: 1;grid-row-end: 2;">'
 
-    with open(meta_data_path, newline = '') as file:
-        reader = csv.reader(file, delimiter='\t')
+    with open(args.input, newline = '') as file:
+        reader = list(csv.reader(file))[1:]
+        key = 0
+        id = 0
+        x = False
         for row in reader:
-            if len(row) > 0:
-                if len(row) == 1 and "__________" in row[0] and name == False: 
-                    name = True
-                    run += 1
-                elif name == True:
-                    header = row[0]
-                    if x == True:
-                        x = False
-                    else:
-                        string += '</div>'
-                    string += '<div class="grid_container">'
-                    string += '<div id="' + str(id) + '_line" class="line" style="grid-column: 1 / 1000;grid-row: 2 / 4;background-color: rgba(0, 0, 0);opacity: 0.2;"></div>'
-                    line_no = line_no + 4
-                    line_no_2 = line_no + 2
-                    name = False
-                else:
-                    name = False
-                if len(row) == 1 and "---------------" in row[0]:
-                    gene_no_row = gene_no_row_2
-                    gene_no_row_2 = gene_no_row + 4
-                    start_next = True
-                elif len(row) == 1 and "---------------" not in row[0]:
-                    start_next = False
-                elif start_next == True:
-                    start = math.ceil(int(row[1])*factor)
-                    end = math.ceil(int(row[2])*factor)
+            if row[0] != key:
+                for i in final:
+                    if int(i[0]) == int(row[0]):
+                        high = i[1]
+                        break
+                if x == True:
+                    string += '</div>'
+                string += '<div class="grid_container">'
+                string += '<div id="' + str(id) + '_line" class="line" style="grid-column: 1 / ' + str(math.ceil(int(high)*factor)) + ';grid-row: 2 / 4;background-color: rgba(0, 0, 0);opacity: 0.2;"></div>'
+            
 
-                    if any(keyword in row[0].lower() for keyword in tnps):
-                        color='violet'
-                        color = 'rgb(0, 181, 253)'
-                    elif any(keyword in row[0].lower() for keyword in ints):
-                        color='yellow'
-                        color = 'rgb(253, 228, 0)'
-                    elif any(keyword in row[0].lower() for keyword in mobiles):
-                        color='green'
-                        color = 'rgba(0, 255, 13)'
-                    elif any(keyword in row[0].lower() for keyword in res):
-                        color='DodgerBlue'
-                        color = 'rgba(0, 183, 255)'
-                    elif 'hypothetical' in row[0].lower():
-                        color='grey'
-                        color = 'rgb(153, 153, 153)'
+            if any(keyword in row[4].lower() for keyword in tnps):
+                color='violet'
+                color = 'rgb(0, 181, 253)'
+            elif any(keyword in row[4].lower() for keyword in ints):
+                color='yellow'
+                color = 'rgb(253, 228, 0)'
+            elif any(keyword in row[4].lower() for keyword in mobiles):
+                color='green'
+                color = 'rgba(0, 255, 13)'
+            elif any(keyword in row[4].lower() for keyword in res):
+                color='DodgerBlue'
+                color = 'rgba(0, 183, 255)'
+            elif 'hypothetical' in row[4].lower():
+                color='grey'
+                color = 'rgb(153, 153, 153)'
+            else:
+                color='black'
+                color = 'rgb(0, 0, 0)'
 
-                    if row[3] == '+' or row[3] == '-':
-                        if row[3] == '+':
-                            string += '<div id="'+ str(id) +'_gene" class="R all" style="grid-column: '+ str(start) +' / '+ str(end) +';grid-row: 1 / 5;background-color: '+ color +';margin-right: 15px;opacity: 0.7;"><p></p></div>'
-                            string += '<div class="AR right" id="'+ str(id) +'_gene_arrow" style="grid-column: '+ str(end) +' / '+ str(end) +';grid-row: 1 / 5;--my-color-var: '+ color +';opacity: 0.7;"></div>'
-                        elif row[3] == '-':
-                            string += '<div class="AL left" id="'+ str(id) +'_gene_arrow" style="grid-column: '+ str(start) +' / '+ str(start) +';grid-row: 1 / 5;--my-color-var: '+ color +';opacity: 0.7;"></div>'
-                            string += '<div id="'+ str(id) +'_gene" class="L all" style="grid-column: '+ str(start) +' / '+ str(end) +';grid-row: 1 / 5;background-color: '+ color +';margin-left: 15px;opacity: 0.7;"><p></p></div>'
+            start = math.ceil(int(row[5])*factor)
+            end = math.ceil(int(row[6])*factor)
 
-                        string += '<div id="'+ str(id) +'_gene_info" class="hidden info_box"><button class="exit">X</button><p><strong>Organism:</strong> Citrobacter farmeri</p><p><strong>Accession:</strong> H23409823.1</p><p><strong>Gene:</strong> '+ row[0] +'</p><p><strong>Start:</strong> '+ str(row[1]) +'</p><p><strong>End:</strong> '+ str(row[2]) +'</p><textarea id="'+ str(id) +'_gene_sequence">'+ header +'&#13;&#10;'+ row[4] +'</textarea><button id="'+ str(id) +'" class="copy btn";">Copy</button></div>'           
-                id += 1   
+            if row[7] == '+':
+                string += '<div id="'+ str(id) +'_gene" class="R all" style="grid-column: '+ str(start) +' / '+ str(end) +';grid-row: 1 / 5;background-color: '+ color +';margin-right: 15px;opacity: 0.7;"><p></p></div>'
+                string += '<div class="AR right" id="'+ str(id) +'_gene_arrow" style="grid-column: '+ str(end) +' / '+ str(end) +';grid-row: 1 / 5;--my-color-var: '+ color +';opacity: 0.7;"></div>'
+            elif row[7] == '-':
+                string += '<div class="AL left" id="'+ str(id) +'_gene_arrow" style="grid-column: '+ str(start) +' / '+ str(start) +';grid-row: 1 / 5;--my-color-var: '+ color +';opacity: 0.7;"></div>'
+                string += '<div id="'+ str(id) +'_gene" class="L all" style="grid-column: '+ str(start) +' / '+ str(end) +';grid-row: 1 / 5;background-color: '+ color +';margin-left: 15px;opacity: 0.7;"><p></p></div>'
+
+            string += '<div id="'+ str(id) +'_gene_info" class="hidden info_box"><button class="exit">X</button><p><strong>Organism:</strong>' + row[2] + '</p><p><strong>Accession:</strong> ' + row[3] + ' </p><p><strong>Gene:</strong> '+ row[4] +'</p><p><strong>Start:</strong> '+ str(row[5]) +'</p><p><strong>End:</strong> '+ str(row[6]) +'</p><textarea id="'+ str(id) +'_gene_sequence">'+ row[2] +'&#13;&#10;'+ row[9] +'</textarea><button id="'+ str(id) +'" class="copy btn";">Copy</button></div>'           
+
+            x = True
+            key = row[0]
+            id += 1   
         string += '</div>'  
 
     html = """
@@ -475,6 +485,10 @@ def create_html(tree_index):
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     </head>
     <style>
+    html, body {
+        margin: 0;
+        height: 100%;
+    }
     .space {
         position: relative;
         height: 50px;
