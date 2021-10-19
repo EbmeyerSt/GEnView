@@ -53,7 +53,7 @@
     .options {
         position: relative;
         top: -250;
-        background-color: rgb(131, 131, 131);
+        background-color: rgb(94, 94, 94);
         width: 25%;
         padding: 10px;
         float: right;
@@ -339,6 +339,8 @@
             $(document).on("click", ".all", function() {  
                 var id = $(this).attr("id");
                 var info = "#" + id + "_info"
+                $(".options").css({top: -250});  
+                $(".options").removeClass("open");
                 if ($(info).hasClass("hidden")) {
                     $(".info_box").addClass("hidden");
                     $(info).removeClass("hidden");

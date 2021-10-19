@@ -621,6 +621,12 @@ def create_tree_index(tree_file_path):
                             final_order.append(name)
                             break
                 i += 1
+    
+    
+    print(final_order)
+
+
+
     space = [0]*5
     lne = [1]*5
     #Assign distances to branches and nodes
@@ -1431,6 +1437,18 @@ def main():
 	else:
 		unique_profiles=profiles
 
+    
+	###HTML OUTPUT
+    #Create index phylogenetic tree f
+	final_tree = create_tree_index(context_file[0].replace('.fna', '.unique.tree'))
+    #Create html of phylogenetic tree and corresponding sequences
+	output = create_html(final_tree)
+	#Write HTML output file
+	write_output(output, args.o)
+
+
+
+
 	#align unique profiles and create phylogeny
 	align(context_file, unique_profiles)
 
@@ -1440,13 +1458,6 @@ def main():
 	#render tree
 	render_tree(tree, context_file)
 
-	###HTML OUTPUT
-    #Create index phylogenetic tree f
-	final_tree = create_tree_index(context_file[0].replace('.fna', '.unique.tree'))
-    #Create html of phylogenetic tree and corresponding sequences
-	output = create_html(final_tree)
-	#Write HTML output file
-	write_output(output, args.o)
 
 
 if __name__=='__main__':
