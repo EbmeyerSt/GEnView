@@ -12,7 +12,7 @@ setup(
 	include_package_data=True,
 	entry_points={
 		'console_scripts': [
-			'genview-create=genview_create_db:main',
-			'genview-visualize=genview_visualize:main'],
+			'genview-create=genview.genview_create_db:main',
+			'genview-visualize=genview.genview_visualize:main'],
 			},
 	zip_safe=False)
