@@ -1,0 +1,43 @@
+{% set name = "genview" %}
+{% set version = "1.0" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  git_url: https://github.com/EbmeyerSt/GEnView.git
+
+build: 
+  number: 0
+  script: python setup.py install
+
+requirements:
+  host:
+    - pip
+    - python=3.6
+  run:
+    - python=3.6
+    - pip
+    - pandas
+    - biopython >=1.68
+    - numpy
+    - time
+    - sqlite
+    - argparse
+    - prodigal
+    - diamond
+    - blast
+    - cd-hit
+    - fasttree
+
+test:
+  commands:
+          - genview-create --help
+          - genview-visualize --help
+
+about:
+  home: https://github.com/EbmeyerSt/GEnView.git
+  license: GPLv3.0
+  license_family: GPL3
+  summary: Gene-centric visualization tool for genomic sequences

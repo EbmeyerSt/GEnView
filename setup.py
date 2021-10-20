@@ -10,4 +10,9 @@ setup(
 
 	packages=find_packages(),
 	include_package_data=True,
+	entry_points={
+		'console_scripts': [
+			'genview-create=genview_scripts.genview_create_db:main',
+			'genview-visualize=genview_scripts.genview_visualize:main'],
+		},
 	zip_safe=False)
