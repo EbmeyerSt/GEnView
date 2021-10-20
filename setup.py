@@ -15,8 +15,6 @@ setup(
 		],
 		packages=find_packages(),
 		include_package_data=True,
-		install_requires=['numpy', 'pandas'],
-		python_requires='>=3.6, <3.7',
 		entry_points={
 			'console_scripts': [
 				'create_db=genview_create_db:main',
