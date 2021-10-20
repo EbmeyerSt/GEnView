@@ -21,5 +21,5 @@ setup(
 			'console_scripts': [
 				'create_db=genview_create_db:main',
 				'visualize=genview_visualize:main'],
-			}
+			},
 	zip_safe=False)
