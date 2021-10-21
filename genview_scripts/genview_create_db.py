@@ -1796,6 +1796,19 @@ def to_sql_db(env_dict, all_anno, target_directory):
 
 def main():
 
+	args=parse_arguments()
+	if args.taxa=='False' and args.acc_list=='False':
+		print('No genomes specified for analysis, please specify either "--acc_list" or "" --taxa')
+		sys.exit()
+
+	if args.update==True:
+		print('Update function is momentarily deprecated, exiting...')
+		sys.exit()
+
+	if args.taxa!='False' and args.acc_list!='False':
+		print('\n--taxa cannot be specified at the same time as --acc_list, please choose only one option\n')
+		sys.exit()
+
 	download_uniprot()
 
 	#Disable for debugging
@@ -2136,23 +2149,4 @@ def create_simple_summary_file():
 
 if __name__=='__main__':
 
-	args=parse_arguments()
-	if args.taxa=='False' and args.acc_list=='False':
-		print('No genomes specified for analysis, please specify either "--acc_list" or "" --taxa')
-		sys.exit()
-
-	if args.update==True:
-		print('Update function is momentarily deprecated, exiting...')
-		sys.exit()
-
-	if args.taxa!='False' and args.acc_list!='False':
-		print('\n--taxa cannot be specified at the same time as --acc_list, please choose only one option\n')
-		sys.exit()
-
-	if not args.update==True:
-		start=timeit.default_timer()
-		main()
-		stop=timeit.default_timer()
-		print('Time elapsed: ', stop-start)
-	else:
-		update()
+	main()
