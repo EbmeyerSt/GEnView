@@ -33,8 +33,8 @@ requirements:
 
 test:
   commands:
-          - genview-create --help
-          - genview-visualize --help
+    - genview-create --help
+    - genview-visualize --help
 
 about:
   home: https://github.com/EbmeyerSt/GEnView.git

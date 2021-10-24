@@ -548,7 +548,6 @@ def download_plasmids():
 	for line in bacterial_plasmids:
 		refseq_dict[line.split('\t')[2]]=line.split('\t')[0]
 		
-
 	#add taxon to plasmid entries
 	new_plasmid_dict={}
 
@@ -1840,6 +1839,10 @@ def main():
 
 	#Disable for debugging
 	args.db=reformat()
+
+	#Create output directory if not exists
+	if not os.path.exists(args.target_directory):
+		os.mkdir(args.target_directory)
 
 	#Download NCBI taxonomy files for lineage assignment
 	if not os.path.exists(args.target_directory.rstrip('/')+'/taxonomy'):
