@@ -927,7 +927,7 @@ def create_html(tree_index):
 						if x == True:
 							string += '</div>'
 						string += '<div class="grid_container">'
-						string += '<div id="' + str(id) + '_line" class="line all" style="grid-column: 1 / ' + str(math.ceil(int(high)*factor)) + ';grid-row: 2 / 4;background-color: rgba(0, 0, 0);opacity: 0.2;"></div>'
+						string += '<div id="' + str(id) + '_line" class="line" style="grid-column: 1 / ' + str(math.ceil(int(high)*factor)) + ';grid-row: 2 / 4;background-color: rgba(0, 0, 0);opacity: 0.2;"></div>'
 						with open(args.o.rstrip('/')+'/../'+'all_flanks.csv_tmp') as file:
 							seq_reader = csv.reader(file, delimiter='\t')
 							for row_n in seq_reader:
@@ -978,7 +978,7 @@ def create_html(tree_index):
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
 		<script type="text/javascript" src="html2canvas.min.js"></script> 
 	</head>
-	<style>
+		<style>
 	html, body {
 		margin: 0;
 		height: 100%;
@@ -1076,10 +1076,16 @@ def create_html(tree_index):
 		z-index: 2;
 		transition: 0.3s;
 		height: 30px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		cursor: pointer;
 	}
 	.all p {
+		color: black;
 		position: relative;
 		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: clip;
 	}
 
 	.line {
@@ -1289,8 +1295,9 @@ def create_html(tree_index):
 
 	.names {
 		overflow:hidden;
-		padding: 5px;
-		margin-top: 2px;
+		padding-left: 5px;
+		padding-right: 5px;
+		margin-top: 7px;
 		width: 200px;
 	}
 	.names p {
@@ -1327,7 +1334,7 @@ def create_html(tree_index):
 			$(arrow).css({ opacity: 1 });
 		});
 		$(document).on("mouseenter", ".line", function() {
-			$(this).css({ opacity: 0.8 });
+			$(this).css({ opacity: 1 });
 			$(this).css({ 'z-index': 10 });
 		});    
 		$(document).on("mouseleave", ".all", function() {
@@ -1347,7 +1354,7 @@ def create_html(tree_index):
 			$(this).css({ 'z-index': 1 });
 		});
 		function reveal() {
-			$(document).on("click", ".all", function() {  
+			$(document).on("click", ".all,.line", function() {  
 				$(".options").css({top: -300});  
             	$(".options").removeClass("open");
 				var id = $(this).attr("id");
@@ -1355,9 +1362,9 @@ def create_html(tree_index):
 				if ($(info).hasClass("hidden")) {
 					$(".info_box").addClass("hidden");
 					$(info).removeClass("hidden");
-					$(info).animate({ right: '0'}, 'slow');  
+					$(info).css({ right: '0'});  
 				} else {
-					$(".info_box").animate({ right: '-350'}, 'slow').addClass("hidden");
+					$(".info_box").css({ right: '-350'}).addClass("hidden");
 				}         
 			});  
 		}
@@ -1367,7 +1374,7 @@ def create_html(tree_index):
 		document.execCommand('copy');
 	}
 	$(document).on("click", ".copy", function() {
-		var id = $(this).getElementById();
+		var id = $(this).attr('id');
 		var id = id + "_gene_sequence";
 		copy_to_clipboard(id)
 		$('#statusmessage').text('Sequence copied to clipboard!').animate({'margin-top':0},200);
@@ -1405,8 +1412,10 @@ def create_html(tree_index):
 		$(".AL").addClass("left_s")
 		$(".tree").addClass('hidden');
 		$(".s_tree").removeClass('hidden')
-		$(".names p").css({ fontSize : "6px" })
-		$(".names p").css({ height : "5px" })
+		$(".names").css({ marginTop : "0" })
+		$(".names p").css({ fontSize : "5px" })
+		$(".names p").css({ height : "0" })
+		
 	});
 	$(document).on("click", "#medium", function() {
 		$(".size").removeClass("active");
@@ -1425,9 +1434,9 @@ def create_html(tree_index):
 		$(".AR").addClass("right_m")
 		$(".tree").addClass('hidden');
 		$(".m_tree").removeClass('hidden')
-		$(".names").css({ marginTop : "1px" })
+		$(".names").css({ marginTop : "3px" })
 		$(".names p").css({ fontSize : "8px" })
-		$(".names p").css({ height : "15px" })
+		$(".names p").css({ height : "14px" })
 	});
 	$(document).on("click", "#large", function() {
 		$(".size").removeClass("active");
@@ -1448,6 +1457,7 @@ def create_html(tree_index):
 		$(".l_tree").removeClass('hidden')
 		$(".names p").css({ fontSize : "12px" })
 		$(".names p").css({ height : "28px" })
+		$(".names").css({ marginTop : "7px" })
 	});
 	$(document).on("change", "#scale", function() {
 		var scale = $(this).val();
@@ -1474,6 +1484,8 @@ def create_html(tree_index):
 		var p = w - 300 - scale - 10;
 		$(".sequences").css({width : p});
 		$("#scale").val(p);
+		$('.node_annot').prop('checked', true)
+		$('.gene_annot').prop('checked', true)
 	});
 	$(document).on("click", "#scale_reset", function() {
 		var w = $( window ).width();
@@ -1504,8 +1516,6 @@ def create_html(tree_index):
 
     	});
 	});
-
-
 
 	function saveAs(uri, filename) {
 		var link = document.createElement('a');
