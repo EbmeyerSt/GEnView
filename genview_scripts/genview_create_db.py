@@ -23,12 +23,13 @@ def parse_arguments():
 	parser.add_argument('--split', help='number of files to obtain for processing flanking regions, default=5', type=int, default=5)
 	parser.add_argument('--update', help=argparse.SUPPRESS, action='store_true')
 	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False, action='store_true')
+	parser.add_argument('--uniprot_db', help='path to database for annotation of surrounding sequences. If unspecified default uniprotKB database will be downloaded to target directory', required=False, action='store_true')
 	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+', default='False')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
 	parser.add_argument('--custom', help='Search custom genomes', action='store_true', default=False)
 	parser.add_argument('--save_tmps', help='keep temporary files', action='store_true', default='False')
-	parser.add_argument('--acc_list', help='csv file containing one accession per row, cannot be specied at the same time as --taxa', default='False')
+	parser.add_argument('--acc_list', help='csv file containing one genome accession number per row, cannot be specied at the same time as --taxa', default='False')
 	parser.add_argument('--integron_finder', help=argparse.SUPPRESS, default='False')
 	parser.add_argument('--flanking_length', help='Max length of flanking regions to annotate', type=int, default=10000)
 	args=parser.parse_args()
@@ -38,37 +39,47 @@ def parse_arguments():
 def download_uniprot():
 
 	#Check if gdown is installed
-	try:
-		import gdown
+	if not args.uniprot:
+		try:
+			import gdown
 
-	except ImportError:
-		install=input('Package gdown is not installed - install now?(y/n)')
-		if install=='y':
-			subprocess.call('pip install gdown', shell=True)
-		else:
-			print('Package gdown is not installed. Use "pip install gdown" to install\
-			or download database file anually from https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc')
-			sys.exit()
+		except ImportError:
+			install=input('Package gdown is not installed - install now?(y/n)')
+			if install=='y':
+				subprocess.call('pip install gdown', shell=True)
+			else:
+				print('Package gdown is not installed. Use "pip install gdown" to install\
+				or download database file anually from https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc')
+				sys.exit()
 
-	#download modified uniprot DB
-	download_uniprot='gdown https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc -O %s'\
-	% args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna.gz'
-	if not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna.gz') and not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna'):
-		subprocess.call(download_uniprot, shell=True)
-		unzip=f'gunzip {args.target_directory.rstrip("/")+"/uniprotKBjan2019.fna.gz"}'
-		subprocess.call(unzip, shell=True)
+		#download modified uniprot DB
+		download_uniprot='gdown https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc -O %s'\
+		% args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna.gz'
+		if not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna.gz') and not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna'):
+			subprocess.call(download_uniprot, shell=True)
+			unzip=f'gunzip {args.target_directory.rstrip("/")+"/uniprotKBjan2019.fna.gz"}'
+			subprocess.call(unzip, shell=True)
 
 		#Transform to diamond database
 		dmnd=f'diamond makedb --in {args.target_directory.rstrip("/")+"/uniprotKBjan2019.fna"} -d {args.target_directory.rstrip("/")+"/uniprotKB.dmnd"}'
 		subprocess.call(dmnd, shell=True)
 
 	#also download is_db
-	download_isdb='gdown https://drive.google.com/uc?id=1otE-8q4xQUxlrV15cosn6GFR1dKlADte -O %s'\
-	% args.target_directory.rstrip('/')+'/is_db.dmnd.gz'
-	if not os.path.exists(args.target_directory.rstrip('/')+'/is_db.dmnd.gz') and not os.path.exists(args.target_directory.rstrip('/')+'/is_db.dmnd'):
-		subprocess.call(download_isdb, shell=True)
-		unzip=f'gunzip {args.target_directory.rstrip("/")+"/is_db.dmnd.gz"}'
-		subprocess.call(unzip, shell=True)
+	if args.is_db and not os.path.exists(args.is_db):
+		download_isdb='gdown https://drive.google.com/uc?id=1otE-8q4xQUxlrV15cosn6GFR1dKlADte -O %s'\
+		% args.target_directory.rstrip('/')+'/is_db.dmnd.gz'
+		if not os.path.exists(args.target_directory.rstrip('/')+'/is_db.dmnd.gz') and not os.path.exists(args.target_directory.rstrip('/')+'/is_db.dmnd'):
+			subprocess.call(download_isdb, shell=True)
+			unzip=f'gunzip {args.target_directory.rstrip("/")+"/is_db.dmnd.gz"}'
+			subprocess.call(unzip, shell=True)
+
+	elif args.is_db and os.path.exists(args.is_db):
+		#Check that this is a diamond database
+		if args.is_db.endswith('.dmnd'):
+			pass
+		else:
+			print('is_db: expects diamond database ending with ".dmnd"\nPlease provide a diamond database')
+			sys.exit()
 
 
 def reformat():
@@ -1339,19 +1350,35 @@ def annotate_orfs(queue):
 	while True:
 
 		#Annotate orfs
+		if not args.uniprot_db:
+			uniprot_db_path=args.target_directory.rstrip('/')+'/uniprotKB.dmnd'
+		else:
+			if args.uniprot_db.endswith('.dmnd'):
+				uniprot_db_path=args.uniprot_db
+
 		if not os.path.exists(fa_file.replace('_orfs.fna', '_orfs_annotated.csv')):
 			diamond_call='diamond blastp -p 30 -d %s -q %s -o %s --id 60 --more-sensitive \
 			--max-target-seqs 1 --masking 0 --subject-cover 60 -f 6 qseqid sseqid stitle pident \
-			qstart qend qlen slen length qframe qtitle' % (args.target_directory.rstrip('/')+'/uniprotKB.dmnd', fa_file, fa_file.replace('_orfs.fna', '_orfs_annotated.csv'))
+			qstart qend qlen slen length qframe qtitle' % (uniprot_db_path, fa_file, fa_file.replace('_orfs.fna', '_orfs_annotated.csv'))
 			subprocess.call(diamond_call, shell=True)
 
 		if args.is_db==True:
+
+			if args.is_db==True and not os.path.exists(args.is_db):
+				is_db_path=args.target_directory.rstrip("/")+"/is_db.dmnd"
+
+			elif os.path.exists(args.is_db):
+				is_db_path=args.is_db
+
 			#Annotate IS and so on here, with 90% identity
 			if not os.path.exists(fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv')):
 				IS_call='diamond blastp -p 30 -d %s -q %s -o %s --id 90 --more-sensitive \
 				--max-target-seqs 1 --masking 0 --subject-cover 90 -f 6 qseqid sseqid stitle pident \
-				qstart qend qlen slen length qframe qtitle' % (args.target_directory.rstrip("/")+"/is_db.dmnd", fa_file, fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv'))
+				qstart qend qlen slen length qframe qtitle' % (is_db_path, fa_file, fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv'))
 				subprocess.call(IS_call, shell=True)
+
+
+
 
 		fa_file=queue.get()
 		if fa_file=='STOP':
