@@ -1,21 +1,72 @@
-#!/usr/local/env python3.7
-import sys, os, subprocess, argparse, ete3, sqlite3, timeit, csv, math, re
+import sys, os, subprocess, argparse, sqlite3, timeit, csv, math, re
 from argparse import RawTextHelpFormatter
-from ete3 import SeqMotifFace, TreeStyle, add_face_to_node, Tree, NodeStyle, TextFace, COLOR_SCHEMES, SVG_COLORS, random_color
 
 def parse_arguments():
-	descr='\nVisualize annotate genes and genetic environments\n'
+	descr='\nExtract, visualize and annotate genes and genetic environments from genview database\n'
 	parser=argparse.ArgumentParser(description=descr.replace("'", ''), formatter_class=RawTextHelpFormatter)
-	parser.add_argument('-db', help='sqlite3 db containing annotations', required=True)
-	parser.add_argument('-o', help='target directory', required=True)
+	parser.add_argument('-gene', help='name of gene/orf to extract and visualize', required=True)
+	parser.add_argument('-db', help='genview database created by genview-create-db', required=True)
+	parser.add_argument('-id', help='percent identity threshold for genes to extract', required=True)
+	parser.add_argument('-taxa', help='list of genera and/or species to extract\nBy default all taxa are extracted', default=False, nargs='+')
 	parser.add_argument('--force', help='Force new alignment and phylogeny', action='store_true')
-	parser.add_argument('--compressed', help='Compress number of displayed sequences', action='store_true')
-	parser.add_argument('--all', help=argparse.SUPPRESS, action='store_true')
+	parser.add_argument('--compressed', help='Compress number of displayed sequences, helpful with large number of identical sequences', action='store_true')
 	args=parser.parse_args()
 
 	return args
 
+def extract():
 
+	#Connect to db
+	connection=sqlite3.connect(args.db)
+	cursor=connection.cursor()
+	
+	#Join tables based on genome ids
+	query=f"""SELECT \
+	args.arg_name, \
+	args.id, \
+	genomes.organism \
+	FROM args \
+	INNER JOIN genomes \
+	ON args.genome_id=genomes.id \
+	WHERE args.arg_name \
+	LIKE \'{args.gene+"%"}\' \
+	AND args.perc_id >= {float(args.id)} \
+	"""
+
+	if args.taxa!=False:
+		i=0
+		for taxon in args.taxa:
+			i+=1
+			if len(args.taxa)>1:
+				if i==1:
+					query+='AND ('
+					query+=f'genomes.organism LIKE \'{taxon+"%"}\' '
+				elif 1<i<len(args.taxa):
+					query+=f'OR genomes.organism LIKE \'{taxon+"%"}\' '
+				else:
+					query+=f'OR genomes.organism LIKE \'{taxon+"%"}\') '
+
+
+	cursor.execute(query)
+
+	results=cursor.fetchall()
+
+	#write create result directory if not exists
+	if not os.path.exists(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'):
+		os.makedirs(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis')
+	
+	#Using the id, go back to the file containing the flanking regions and extract the ones matching the ids 
+	flank_dict={}
+	for line in open(os.path.dirname(args.db).rstrip('/')+'/all_flanks.csv_tmp', 'r'):
+		flank_dict[line.split('\t')[0]]=line.split('\t')[1]
+
+	arg_ids=[result[1] for result in results]
+
+	#write results to output directory 
+	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis/'+args.gene+'_contexts.fna', 'w') as outfile:	
+		for result in results:
+			outfile.write('>'+result[0]+'__'+str(result[1])+'__'+result[2]\
+			+'\n'+flank_dict[str(result[1])]+'\n')
 
 def read_db(context_file):
 
@@ -145,7 +196,7 @@ def read_db(context_file):
 	#Create list header for tmp visualization file
 	vis_list = [['key', 'name', 'organism', 'assembly', 'gene', 'start', 'stop', 'direction', 'group', 'sequence', 'gvid']]
 
-	with open(args.o.rstrip('/')+'/'+'annotation_meta.csv', 'w') as outfile:
+	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'annotation_meta.csv', 'w') as outfile:
 		
 		#To sort genes in right order in annotation metafile, create list of gene starts and stops
 		for key, value in gene_dict.items():
@@ -208,34 +259,34 @@ def read_db(context_file):
 						outfile.write(line)
 	
 	#Create tmp file for visualization
-	with open(args.o.rstrip('/')+'/'+'visualization_meta.csv', 'w') as outfile:
+	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv', 'w') as outfile:
 		write = csv.writer(outfile) 
 		write.writerows(vis_list) 
 
 	return gene_dict
 
-def cluster_seqs(context_file):
+#def cluster_seqs(context_file):
 
 	#temporarily rewrite context file to remove spaces from names
-	with open(context_file[0]+'_tmp', 'w') as outfile:
-		for line in open(context_file[0], 'r'):
-			if line.startswith('>'):
-				outfile.write(line.replace(' ', '_'))
-			else:
-				outfile.write(line)
+#	with open(context_file[0]+'_tmp', 'w') as outfile:
+#		for line in open(context_file[0], 'r'):
+#			if line.startswith('>'):
+#				outfile.write(line.replace(' ', '_'))
+#			else:
+#				outfile.write(line)
 
 	#Use usearch to cluster the sequences at 95%
-	if not os.path.exists(context_file[0]+'.sorted'):
-		sort='usearch -sortbylength %s -fastaout %s' % (context_file[0]+'_tmp', context_file[0]+'.sorted')
-		subprocess.call(sort, shell=True)
+#	if not os.path.exists(context_file[0]+'.sorted'):
+#		sort='usearch -sortbylength %s -fastaout %s' % (context_file[0]+'_tmp', context_file[0]+'.sorted')
+#		subprocess.call(sort, shell=True)
 
-	if not os.path.exists(context_file[0]+'.centroids'):
-		cluster='usearch -cluster_smallmem %s -id 0.95 -centroids %s -uc %s' % \
-		(context_file[0]+'.sorted', context_file[0]+'.centroids', context_file[0]+'.clusters')
-		subprocess.call(cluster, shell=True)
+#	if not os.path.exists(context_file[0]+'.centroids'):
+#		cluster='usearch -cluster_smallmem %s -id 0.95 -centroids %s -uc %s' % \
+#		(context_file[0]+'.sorted', context_file[0]+'.centroids', context_file[0]+'.clusters')
+#		subprocess.call(cluster, shell=True)
 
 	#remove tmp_file
-	os.remove(context_file[0]+'_tmp')
+#	os.remove(context_file[0]+'_tmp')
 
 def cluster_profiles(profiles):
 	
@@ -309,176 +360,14 @@ def align(context_file, unique_profiles):
 
 		subprocess.call(phylogeny, shell=True)
 
-def visualize_phylogeny(gene_dict, context_file):
-	
-	#Read in tree and assign additional information to each leaf
-	t=Tree(context_file[0].replace('.fna', '.unique.tree'))
-
-	for node in t.traverse():
-		if node.is_leaf():
-			id=node.name.split('__')[1]
-			node.add_features(organism=gene_dict[id]['organism'])
-			node.add_features(assembly=gene_dict[id]['assembly'])
-			node.add_features(pident=gene_dict[id]['perc_id'])
-			if args.compressed==True:
-				node.add_features(cluster_size=gene_dict[id]['cluster_size'])
-
-	#Create dictionary to append motifs to
-	motif_dict={}
-
-	#Create keyword lists to set gene color
-	tnps=['iscr', 'transpos', 'tnp', 'insertion']
-	ints=['inti', 'integrase', 'xerc', 'xerd']
-	mobiles=['secretion', 'mobiliza', 'moba', 'mobb', 'mobc', 'mobl', 'plasmid', 'relaxase',\
-		'conjugation', 'type iv']
-	res=['lactam', 'aminoglyco', 'fluoroquinolo', 'tetracyclin', 'macrolid', 'carbapenem']
-
-	print('decorating the tree...')
-	#Create motifs for each gene associated with a leaf
-	for leaf in t.traverse():
-		if leaf.is_leaf():
-		
-			#traverse through environment genes for the respective sequence
-			for key, value in gene_dict.items():
-				motifs=[]
-
-				#Assign start and end position for annotated gene
-				gene_start=int(gene_dict[key]['start']/5)
-				gene_end=int(gene_dict[key]['stop']/5)
-
-				#Sort such that the greater number is end and smaller is start
-				if gene_start>gene_end:
-
-					gene_end=int(gene_dict[key]['start']/5)
-					gene_start=int(gene_dict[key]['stop']/5)
-				
-				#Append motif for annotated gene
-				gene_motif=[gene_start, gene_end,'()', \
-				2, 10, 'red', 'red', 'arial|8|black|'+str(gene_dict[key]['name'])]
-
-				if not str(gene_dict[key]['frame']).startswith('-'):
-					ori_motif=[gene_end, gene_end+10, '>', 2, 10, 'red', 'red', None]
-
-				else:
-					ori_motif=[gene_start-10, gene_start, '<', 2, 10, \
-					'red', 'red', None]
-
-				motifs.extend([gene_motif, ori_motif])
-
-				for key2, value2 in value['env_genes'].items():
-
-					#Set color, default is orange
-					color='orange'
-
-					if any(keyword in value2['env_name'].lower() for keyword in tnps):
-						color='violet'
-					if any(keyword in value2['env_name'].lower() for keyword in ints):
-						color='yellow'
-					if any(keyword in value2['env_name'].lower() for keyword in mobiles):
-						color='green'
-					if any(keyword in value2['env_name'].lower() for keyword in res):
-						color='DodgerBlue'
-					if 'hypothetical' in value2['env_name']:
-						color='grey'
-
-					#Create motif for one env gene at a time and append to motif list
-					motif=[int(value2['env_start']/5), int(value2['env_stop']/5), '()', 2, 10, color, color, \
-					'arial|8|black|'+str(value2['env_name'])]
-
-					#Set condition: If env gene != annotated gene, append motif
-					arg_pos={i for i in range(int(gene_motif[0]), int(gene_motif[1]))}
-					env_pos={i for i in range(int(motif[0]), int(motif[1]))}
-					
-					#Calculate overlap percentage between annotated gene and env gene
-					total_overlap=float(len(arg_pos.intersection(env_pos)))
-					overlap_perc=float(total_overlap/int(gene_dict[key]['length']/5))*100
-
-					if overlap_perc<=70.0:
-						motifs.append(motif)
-
-						#Create additional motif to show gene orientation
-						if value2['env_strand']=='+':
-							ori_motif=[int(value2['env_stop']/5), int(value2['env_stop']/5+10), '>', 2, 10, \
-							color, color, None]
-
-						else:
-							ori_motif=[int(value2['env_start']/5-10), int(value2['env_start']/5), '<', 2, 10, \
-							color, color, None]
-
-						motifs.append(ori_motif)
-
-				#append motif lists to respective annotated gene in dict
-				gene_dict[key]['motifs']=motifs
-
-	#Set node style
-	nst_plasmid=NodeStyle()
-	nst_plasmid['bgcolor']='DarkSeaGreen'
-	nst_other=NodeStyle()
-	nst_other='AntiqueWhite'
-
-	#Now annotate the tree with the motifs
-	for node in t.traverse():
-		if node.is_leaf():
-			if 'plasmid' in node.organism:
-				node.set_style(nst_plasmid)
-			else:
-				node.set_style(nst_other)
-			
-			seqFace=SeqMotifFace(seq=None, motifs=gene_dict[node.name.split('__')[1]]['motifs'], \
-			seq_format='blank', gap_format='line')
-			(t & node.name).add_face(seqFace, 1, 'aligned')
-
-			#Create box showing gene percent id
-			similarity=TextFace(node.pident, fsize=8)
-			similarity.margin_top=2
-			similarity.margin_bottom=2
-			similarity.margin_left=2
-			similarity.margin_right=2
-
-			#Set box background color based on pident
-			if node.pident<=90.0:
-				similarity.background.color='DarkGoldenrod'
-			elif 90.0<node.pident<=95.0:
-				similarity.background.color='ForestGreen'
-			elif 95.0<=node.pident:
-				similarity.background.color='YellowGreen'
-
-			node.add_face(similarity, column=2, position='aligned')
-	
-			#Create box showing cluster size
-			if args.compressed==True:
-				clust_box=TextFace(node.cluster_size, fsize=8)
-				clust_box.margin_top=2
-				clust_box.margin_bottom=2
-				clust_box.margin_left=2
-				clust_box.margin_right=2
-
-				node.add_face(clust_box, column=3, position='aligned')
-
-	#Return the annotated tree
-	return t
-
-def render_tree(tree, context_file):
-
-	print('rendering tree...')
-	print (tree)
-	ts=TreeStyle()
-	ts.tree_width=30
-	if not args.compressed==True:
-		tree.render(context_file[0].replace('fna', '_tree_annotated.pdf'), tree_style=ts)
-	else:
-		print(context_file[0].replace('.centroids', '_tree_compressed.pdf'))
-		tree.render(context_file[0].replace('.centroids', '_tree_compressed.pdf'), tree_style=ts)
-	print('tree rendered!')
-
 
 
 ###HTML VERSION###
 #Create a text index file of the phylogenetic tree
 def make_text(final_tree):
-	if os.path.exists(args.o + "/index_tree.txt"):
-		os.remove(args.o + "/index_tree.txt")
-	f = open(args.o + "/index_tree.txt", "a")
+	if os.path.exists(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis' + "/index_tree.txt"):
+		os.remove(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis' + "/index_tree.txt")
+	f = open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis' + "/index_tree.txt", "a")
 	for row in final_tree:
 		f.write(str(row))
 		f.write('\n')
@@ -849,7 +738,7 @@ def create_html(tree_index):
 	tree_string += create_tree_lines(tree, 4, 's_tree')
 
 	#Get max sequence length
-	with open(args.o.rstrip('/')+'/'+'visualization_meta.csv', newline = '') as org_file:
+	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv', newline = '') as org_file:
 		reader = list(csv.reader(org_file))[1:]
 		values = []
 		org = []
@@ -885,7 +774,7 @@ def create_html(tree_index):
 	name_string = ''
 	name_string += '<div class="names" style="grid-column-start: 2; grid-column-end: 3;grid-row-start: 1;grid-row-end: 2;"><div class="grid_container">'
 	#Create names
-	with open(args.o.rstrip('/')+'/'+'visualization_meta.csv', newline = '') as file:
+	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv', newline = '') as file:
 		reader = list(csv.reader(file))[1:]
 		start = 1
 		stop = 5
@@ -911,7 +800,7 @@ def create_html(tree_index):
 
 
 	#Create genetic environment
-	with open(args.o.rstrip('/')+'/'+'visualization_meta.csv', newline = '') as file:
+	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv', newline = '') as file:
 		reader = list(csv.reader(file))[1:]
 		key = 0
 		id = 0
@@ -928,7 +817,7 @@ def create_html(tree_index):
 							string += '</div>'
 						string += '<div class="grid_container">'
 						string += '<div id="' + str(id) + '_line" class="line" style="grid-column: 1 / ' + str(math.ceil(int(high)*factor)) + ';grid-row: 2 / 4;background-color: rgba(0, 0, 0);opacity: 0.2;"></div>'
-						with open(args.o.rstrip('/')+'/../'+'all_flanks.csv_tmp') as file:
+						with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/../'+'all_flanks.csv_tmp') as file:
 							seq_reader = csv.reader(file, delimiter='\t')
 							for row_n in seq_reader:
 								if int(row_n[0]) == int(row[0]):
@@ -1035,11 +924,15 @@ def write_output(output, output_dir):
 
 
 def main():
-	#Extract file containing flanking regions
-	context_file=[args.o.rstrip('/')+'/'+file for file in os.listdir(args.o) if file.endswith('_contexts.fna')]
 
-	if args.compressed==True:
-		cluster_seqs(context_file)
+	global args
+	args=parse_arguments()
+
+	#Extract genes from db
+	extract()
+	#Extract file containing flanking regions
+	context_file=[os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+file for file in os.listdir(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis') if file.endswith('_contexts.fna')]
+
 	#Collect gene entries from the database
 	gene_dict=read_db(context_file)
 
@@ -1050,49 +943,22 @@ def main():
 	#Identify unique profiles
 	if args.compressed==True:
 		unique_profiles=cluster_profiles(profiles)
+
 	else:
 		unique_profiles=profiles
 
 	
+	#align unique profiles and create phylogeny
+	align(context_file, unique_profiles)
+
 	###HTML OUTPUT
 	#Create index phylogenetic tree f
 	final_tree = create_tree_index(context_file[0].replace('.fna', '.unique.tree'))
 	#Create html of phylogenetic tree and corresponding sequences
 	output = create_html(final_tree)
 	#Write HTML output file
-	write_output(output, args.o)
+	write_output(output, os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis')
 	exit()
 
-
-
-
-	#align unique profiles and create phylogeny
-	align(context_file, unique_profiles)
-
-	#Use ete3 to annotate and visualize the tree
-	tree=visualize_phylogeny(gene_dict, context_file)
-
-	#render tree
-	render_tree(tree, context_file)
-
-
-
 if __name__=='__main__':
-	args=parse_arguments()
-	if not args.all==True:
-		start=timeit.default_timer()
-		main()
-		stop=timeit.default_timer()
-		print('Time elapsed: ', stop-start)
-	else:
-		outfiles=[element[0] for element in os.walk(args.o)]
-		outdirs=outfiles[1:]
-		for outdir in outdirs:
-			args.o=outdir
-			try:
-				start=timeit.default_timer()
-				main()
-				stop=timeit.default_timer()
-				print('Time elapsed: ', stop-start)
-			except:
-				print(f'Something went wrong when trying to process {args.o}!')
+	main()
