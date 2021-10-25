@@ -33,7 +33,7 @@ requirements:
 
 test:
   commands:
-    - genview-create --help
+    - genview-makedb --help
     - genview-visualize --help
 
 about:
