@@ -826,7 +826,7 @@ def create_html(tree_index):
 							for row_n in seq_reader:
 								if int(row_n[0]) == int(row[0]):
 									string += '<div id="'+ str(id) +'_line_info" class="hidden info_box"><button class="exit">X</button><p><strong>GVID:</strong>' + row[0] + '</p><p><strong>Organism:</strong>' + row[2] + '</p><p><strong>Accession:</strong> ' + row[3] + ' </p><textarea id="'+ str(id) +'_gene_sequence">' + '&#62' + row[2].replace(' ', '_') + '_' + row[3] +'&#13;&#10;'+ row_n[1] +'</textarea><button id="'+ str(id) +'" class="copy btn";">Copy</button></div>'           
-
+					indx = 4
 					if any(keyword in row[4].lower() for keyword in tnps):
 						color='violet'
 						color = 'rgb(0, 181, 253)'
@@ -837,6 +837,7 @@ def create_html(tree_index):
 						color='green'
 						color = 'rgba(0, 255, 13)'
 					elif any(keyword in row[4].lower() for keyword in res):
+						indx = 1
 						color='DodgerBlue'
 						color = 'rgba(0, 183, 255)'
 					elif 'hypothetical' in row[4].lower():
@@ -850,11 +851,11 @@ def create_html(tree_index):
 					end = math.ceil(int(row[6])*factor)
 
 					if row[7] == '+':
-						string += '<div id="'+ str(id) +'_gene" class="R all" style="grid-column: '+ str(start) +' / '+ str(end) +';grid-row: 1 / 5;background-color: '+ color +';margin-right: 15px;opacity: 1.0;"><p class="gene_annot" style="font-size:8px;">' + row[4] + '</p></div>'
+						string += '<div id="'+ str(id) +'_gene" class="R all" style="grid-column: '+ str(start) +' / '+ str(end) +';grid-row: 1 / 5;background-color: '+ color +';margin-right: 15px;opacity: 1.0;"><p class="gene_annot" style="font-size:8px;">' + row[indx] + '</p></div>'
 						string += '<div class="AR right" id="'+ str(id) +'_gene_arrow" style="grid-column: '+ str(end) +' / '+ str(end) +';grid-row: 1 / 5;--my-color-var: '+ color +';opacity: 1.0;"></div>'
 					elif row[7] == '-':
 						string += '<div class="AL left" id="'+ str(id) +'_gene_arrow" style="grid-column: '+ str(start) +' / '+ str(start) +';grid-row: 1 / 5;--my-color-var: '+ color +';opacity: 1.0;"></div>'
-						string += '<div id="'+ str(id) +'_gene" class="L all" style="grid-column: '+ str(start) +' / '+ str(end) +';grid-row: 1 / 5;background-color: '+ color +';margin-left: 15px;opacity: 1.0;"><p class="gene_annot" style="font-size:8px;">' + row[4] + '</p></div>'
+						string += '<div id="'+ str(id) +'_gene" class="L all" style="grid-column: '+ str(start) +' / '+ str(end) +';grid-row: 1 / 5;background-color: '+ color +';margin-left: 15px;opacity: 1.0;"><p class="gene_annot" style="font-size:8px;">' + row[indx] + '</p></div>'
 
 					string += '<div id="'+ str(id) +'_gene_info" class="hidden info_box"><button class="exit">X</button><p><strong>GVID:</strong>' + row[0] + '</p><p><strong>Organism:</strong>' + row[2] + '</p><p><strong>Gene:</strong> '+ row[4] +'</p><p><strong>Position:</strong> '+ str(row[5]) + ' - ' + str(row[6]) + ' (' + row[7] + ')' + '</p><textarea id="'+ str(id) +'_gene_sequence">' + '&#62' + row[2].replace(' ', '_') + '_GVID.' + str(row[10]) +'&#13;&#10;'+ row[9] +'</textarea><button id="'+ str(id) +'" class="copy btn";">Copy</button></div>'           
 
