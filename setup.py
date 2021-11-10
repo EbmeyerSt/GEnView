@@ -3,7 +3,7 @@ import pathlib
 
 setup(
 	name='genview',
-	version='1.0',
+	version='0.1',
 	description='Gene-centric visualization tool for genomic sequences',
 	url='https://github.com/EbmeyerSt/GEnView',
 	author='Stefan Ebmeyer',
