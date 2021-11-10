@@ -1,5 +1,3 @@
-#!/usr/local/env python3.7
-
 import pandas as pd
 import timeit
 import numpy as np
@@ -24,6 +22,7 @@ def parse_arguments():
 	parser.add_argument('--update', help=argparse.SUPPRESS, action='store_true')
 	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False, action='store_true')
 	parser.add_argument('--uniprot_db', help='path to database for annotation of surrounding sequences. If unspecified default uniprotKB database will be downloaded to target directory', required=False, action='store_true')
+	parser.add_argument('--uniprot_cutoff', help='% identity threshold for annotating orfs aurrounding the target sequence, default 60', default=60)
 	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+', default='False')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
@@ -39,7 +38,7 @@ def parse_arguments():
 def download_uniprot():
 
 	#Check if gdown is installed
-	if not args.uniprot:
+	if not args.uniprot_db:
 		try:
 			import gdown
 
@@ -568,7 +567,7 @@ def download_plasmids():
 	if args.update==True:
 		
 		#Connect to database and fetch species present in previous database version
-		connection=sqlite3.connect(args.target_directory.rstrip('/')+'/context_db_flank.db')
+		connection=sqlite3.connect(args.target_directory.rstrip('/')+'/genview_database.db')
 		cursor=connection.cursor()
 
 		query="""SELECT organism from genomes;"""
@@ -744,7 +743,7 @@ def update():
 				print(f'lineages assigned, {excepts} of {len(asm_dict)} could not be assigned')
 
 				#Connect to database and fetch species present in previous database version
-				connection=sqlite3.connect(args.target_directory.rstrip('/')+'/context_db_flank.db')
+				connection=sqlite3.connect(args.target_directory.rstrip('/')+'/genview_database.db')
 				cursor=connection.cursor()
 
 				query="""SELECT organism from genomes;"""
@@ -1356,9 +1355,9 @@ def annotate_orfs(queue):
 				uniprot_db_path=args.uniprot_db
 
 		if not os.path.exists(fa_file.replace('_orfs.fna', '_orfs_annotated.csv')):
-			diamond_call='diamond blastp -p 30 -d %s -q %s -o %s --id 60 --more-sensitive \
+			diamond_call=f'diamond blastp -p 30 -d {uniprot_db_path} -q {fa_file} -o {fa_file.replace("_orfs.fna", "_orfs_annotated.csv")} --id {args.uniprot_cutoff} --more-sensitive \
 			--max-target-seqs 1 --masking 0 --subject-cover 60 -f 6 qseqid sseqid stitle pident \
-			qstart qend qlen slen length qframe qtitle' % (uniprot_db_path, fa_file, fa_file.replace('_orfs.fna', '_orfs_annotated.csv'))
+			qstart qend qlen slen length qframe qtitle'
 			subprocess.call(diamond_call, shell=True)
 
 		if args.is_db==True:
@@ -1519,7 +1518,7 @@ def integrons_to_db():
 				integron_dict[key][key2]['int_complete']='incomplete'
 
 	#Save results to database
-	connection=sqlite3.connect(args.target_directory.rstrip('/')+'/context_db_flank.db')
+	connection=sqlite3.connect(args.target_directory.rstrip('/')+'/genview_database.db')
 	cursor=connection.cursor()
 
 	if not args.update==True:
@@ -1684,7 +1683,7 @@ def to_sql_db(env_dict, all_anno, target_directory):
 
 	#Create an sql database to save information on flanking genes, seqs etc in. Delete fasta files after
 	#Create database file
-	connection=sqlite3.connect(target_directory.rstrip('/')+'/context_db_flank.db')
+	connection=sqlite3.connect(target_directory.rstrip('/')+'/genview_database.db')
 
 
 	#Create a cursor to perform sql commands
@@ -1822,6 +1821,7 @@ def to_sql_db(env_dict, all_anno, target_directory):
 
 def main():
 
+	global args
 	args=parse_arguments()
 	if args.taxa=='False' and args.acc_list=='False':
 		print('No genomes specified for analysis, please specify either "--acc_list" or "" --taxa')
@@ -2125,7 +2125,7 @@ def transposon_table():
 
 	#Create table that contains args having a transposon 3000kbp upstream/downstream
 	#of them and associated transposon annotation
-	connection=sqlite3.connect(args.target_directory.rstrip('/')+'/context_db_flank.db')
+	connection=sqlite3.connect(args.target_directory.rstrip('/')+'/genview_database.db')
 	cursor=connection.cursor()
 
 	find_tnp_args="""

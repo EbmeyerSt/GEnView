@@ -1,5 +1,9 @@
-import sys, os, subprocess, argparse, sqlite3, timeit, csv, math, re
+import sys, os, subprocess, argparse, sqlite3, timeit, csv, math, re, multiprocessing
 from argparse import RawTextHelpFormatter
+
+"""Tutorial command:
+	genview-visualize -gene PER-1 -db /path/to/genview_database.db -id 80 
+"""
 
 def parse_arguments():
 	descr='\nExtract, visualize and annotate genes and genetic environments from genview database\n'
@@ -345,8 +349,8 @@ def align(context_file, unique_profiles):
 	#Create mafft alignment of unique sequences
 	if not os.path.exists(context_file[0].replace('.fna', '.unique.aln')) or args.force == True:
 	
-		align='mafft --auto --reorder --thread 48 %s > %s' \
-		% (context_file[0].replace('.fna', '.unique.fna'), context_file[0]\
+		align='mafft --auto --reorder --thread %r  %s > %s' \
+		% (multiprocessing.cpu_count(), context_file[0].replace('.fna', '.unique.fna'), context_file[0]\
 		.replace('.fna', '.unique.aln'))
 
 		subprocess.call(align, shell=True)
