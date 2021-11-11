@@ -9,24 +9,31 @@ from multiprocessing import Manager
 from collections import defaultdict
 from Bio.Seq import Seq
 
+"""Tutorial command:
+genview-makedb -d /path/to/output/directory -db /path/to/reference/PER.fna -p 10 -id 80 --taxa rheinheimera --assemblies
+
+Alternatively, if you already know which genomes you want to compare, you can specify their GenBank accessions via --acc_list, e.g:
+
+genview-makedb -d /path/to/output/directory -db /path/to/reference/PER.fna -p 10 -id 80 --acc_list /path/to/accessions.txt --assemblies
+"""
+
 
 def parse_arguments():
 	man_description='Creates sqlite3 database with genetic environment from genomes containing the provided reference gene(s).'
 	parser=argparse.ArgumentParser(description=man_description.replace("'", ""), formatter_class=RawTextHelpFormatter)
 	parser.add_argument('-d', '--target_directory', help='path to output directory', required=True)
 	parser.add_argument('-db', '--database', help='fasta/multifasta file containing amino acid sequences of translated genes to be annotated', required=True)
-	parser.add_argument('-p', '--processes', help='of cores to run the script on', type=int, default=multiprocessing.cpu_count())
+	parser.add_argument('-p', '--processes', help='number of cores to run the script on', type=int, default=multiprocessing.cpu_count())
 	parser.add_argument('-id', '--identity', help='identity cutoff for hits to be saved to the database (e.g 80 for 80%% cutoff)', type=float, default=90)
 	parser.add_argument('-scov', '--subject_coverage', help='minimum coverage for a hit to be saved to db (e.g 80 for 80%% cutoff)', type=float, default=90)
-	parser.add_argument('--split', help='number of files to obtain for processing flanking regions, default=5', type=int, default=5)
 	parser.add_argument('--update', help=argparse.SUPPRESS, action='store_true')
 	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False, action='store_true')
 	parser.add_argument('--uniprot_db', help='path to database for annotation of surrounding sequences. If unspecified default uniprotKB database will be downloaded to target directory', required=False, action='store_true')
-	parser.add_argument('--uniprot_cutoff', help='% identity threshold for annotating orfs aurrounding the target sequence, default 60', default=60)
+	parser.add_argument('--uniprot_cutoff', help='%% identity threshold for annotating orfs aurrounding the target sequence, default 60', default=60)
 	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+', default='False')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
-	parser.add_argument('--custom', help='Search custom genomes', action='store_true', default=False)
+	parser.add_argument('--custom', help='Search custom genomes', action='store_true', default='False')
 	parser.add_argument('--save_tmps', help='keep temporary files', action='store_true', default='False')
 	parser.add_argument('--acc_list', help='csv file containing one genome accession number per row, cannot be specied at the same time as --taxa', default='False')
 	parser.add_argument('--integron_finder', help=argparse.SUPPRESS, default='False')
@@ -60,8 +67,10 @@ def download_uniprot():
 			subprocess.call(unzip, shell=True)
 
 		#Transform to diamond database
-		dmnd=f'diamond makedb --in {args.target_directory.rstrip("/")+"/uniprotKBjan2019.fna"} -d {args.target_directory.rstrip("/")+"/uniprotKB.dmnd"}'
-		subprocess.call(dmnd, shell=True)
+		if not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKB.dmnd'):
+
+			dmnd=f'diamond makedb --in {args.target_directory.rstrip("/")+"/uniprotKBjan2019.fna"} -d {args.target_directory.rstrip("/")+"/uniprotKB.dmnd"}'
+			subprocess.call(dmnd, shell=True)
 
 	#also download is_db
 	if args.is_db and not os.path.exists(args.is_db):
@@ -145,10 +154,14 @@ def download_new(queue):
 
 	if args.update==True:
 		#Set target directory to temporary update directory
-		target_dir=args.target_directory.rstrip('/')+'/'+'update_tmp'
+		if not os.path.exists(args.target_directory.rstrip('/')+'/'+'update_tmp/genomes'):
+			os.mkdir(args.target_directory.rstrip('/')+'/'+'update_tmp/genomes')
+		target_dir=args.target_directory.rstrip('/')+'/'+'update_tmp/genomes'
 	else:
 
-		target_dir=args.target_directory.rstrip('/')
+		if not os.path.exists(args.target_directory.rstrip('/')+'/genomes'):
+			os.mkdir(args.target_directory.rstrip('/')+'/genomes')
+		target_dir=args.target_directory.rstrip('/')+'/genomes'
 
 	while True:
 
@@ -182,7 +195,7 @@ def download_new(queue):
 		if url=='STOP':
 			return
 
-def split_fasta(split_num):
+def split_fasta():
 
 	if args.update==True:
 		#Split concatenated fasta file into several smaller ones
@@ -191,13 +204,11 @@ def split_fasta(split_num):
 	else:
 		file=args.target_directory.rstrip('/')+'/all_assemblies.fna'
 		target_dir=args.target_directory.rstrip('/')
-		split_num=args.split
 
 	line_num=0
 	for line in open(file, 'r'):
 		line_num+=1
 
-	print('%d lines' % line_num)
 	multiplicator=1
 	iterated_lines=0
 
@@ -212,10 +223,10 @@ def split_fasta(split_num):
 		if iterated_lines==1:
 			outfile=open(target_dir+'/all_assemblies_'+str(multiplicator)+'.fna', 'w')
 
-		if iterated_lines<=(line_num/split_num)*multiplicator:	
+		if iterated_lines<=(line_num/args.processes)*multiplicator:	
 			outfile.write(line)
 
-		elif iterated_lines>=(line_num/split_num)*multiplicator and previous_complete==False:
+		elif iterated_lines>=(line_num/args.processes)*multiplicator and previous_complete==False:
 			outfile.write(line)
 		else:
 			multiplicator+=1
@@ -233,7 +244,7 @@ def concatenate_and_split():
 		print('Concatenating novel assemblies...')
 		#Collect new genome fasta files
 		new_genomes=[content[0].rstrip('/')+'/'+element for content \
-		in os.walk(target_dict) \
+		in os.walk(target_dict.rstrip('/')+'/genomes') \
 		for element in content[2] if element.endswith('_genomic.fna')]
 
 		#Write content of all fasta files to one file, append assembly name to respective contig
@@ -248,12 +259,9 @@ def concatenate_and_split():
 						outfile.write(line)
 				outfile.write('\n')
 	
-	
-	split_num=args.split
-
 	#Split fasta file into smaller files
-	print('Splitting into %d files...' % split_num)
-	split_fasta(split_num)
+	print('Splitting into %d files...' % args.processes)
+	split_fasta()
 
 	#Create .csv version of each file
 	#Get list of all target files
@@ -262,9 +270,60 @@ def concatenate_and_split():
 	 if file.endswith('.fna') and file.startswith('all_assemblies_')]
 
 	#Multiprocess
-	p=10
-	multiprocess(convert_fa_to_csv, p, fna_files)
+	multiprocess(convert_fa_to_csv, args.processes, fna_files)
 	print('All files converted to .csv')
+	csv_files=[target_dict+'/'+file \
+	for file in os.listdir(target_dict)\
+	 if file.endswith('.csv') and file.startswith('all_assemblies_')]
+
+	#concatenate files back into number of split files specified
+	#through number of genomes to download
+	reconcatenate(fna_files)
+	reconcatenate(csv_files)
+
+
+def reconcatenate(file_list):
+
+	file_ending={file.split('.')[-1] for file in file_list}
+	index=0
+	new_files=[]
+	print(f'Reconcatenating .{list(file_ending)[0]} files into {split_num} file(s)')
+	for num in range(split_num):
+
+		all_files=False
+		new_index=index+int(len(file_list)/split_num)+\
+		(len(file_list)%split_num>0)
+
+		if new_index<=len(file_list):
+			sub_list=file_list[index:new_index]
+			index=new_index
+
+		else:
+			all_files=True
+			sub_list=file_list[index:]
+
+		cat_command='cat '
+		for file in sub_list:
+			cat_command=cat_command+f'{file} '
+		cat_command=cat_command+f'> {os.path.dirname(file).rstrip("/")}/all_assemblies_{num}.{list(file_ending)[0]}.reconcat'
+		subprocess.call(cat_command, shell=True)
+		new_files.append(f'{os.path.dirname(file).rstrip("/")}/all_assemblies_{num}.{list(file_ending)[0]}.reconcat')
+		
+	#remove previous files
+	for file in file_list:
+		os.remove(file)
+	
+	#Rename new files to match old names
+	for file in new_files:
+		os.rename(file, file.replace(list(file_ending)[0]+'.reconcat', list(file_ending)[0]))
+		
+
+		
+
+
+
+
+	
 
 def add_taxonomy_lineages(summary_files):
 
@@ -349,7 +408,7 @@ def add_taxonomy_lineages(summary_files):
 	new_lineages=Manager().dict()
 	lineage_list=[[key, value['lineage'], value['name']] for key, value in lineages.items()]
 
-	multiprocess(assign_lineage_names, 20, lineage_list, new_lineages)
+	multiprocess(assign_lineage_names, args.processes, lineage_list, new_lineages)
 
 	return new_lineages
 
@@ -770,9 +829,8 @@ def update():
 			else:
 				
 				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
-		processes=10
 		print(f'GENOME URLS:{genome_urls}')
-		multiprocess(download_new, processes, genome_urls)
+		multiprocess(download_new, args.processes, genome_urls)
 
 
 	if args.plasmids==True:
@@ -857,8 +915,7 @@ def update():
 	if file.startswith('flanking_regions') and file.endswith('.fna') and not '_orfs' in file]
 
 	#Create a multiprocessing queue from the flanking region files
-	processes=25
-	multiprocess(run_prodigal, processes, flanking_fa)
+	multiprocess(run_prodigal, args.processes, flanking_fa)
 
 	#concatenate all orf files into one for clustering
 	concat_command='cat %s/flanking_regions_*_orfs.fna > %s/all_orfs.fna' % \
@@ -880,7 +937,7 @@ def update():
 			seq+=line
 			centr_dict[header]=seq
 
-	outfiles=args.split
+	outfiles=split_num
 
 	key_count=0
 	file_count=1
@@ -888,7 +945,7 @@ def update():
 	'split_'+str(file_count)+'_orfs.fna', 'w')
 	for key, value in centr_dict.items():
 		key_count+=1
-		if key_count<=round((len(centr_dict)/args.split)+0.5, 0):
+		if key_count<=round((len(centr_dict)/split_num)+0.5, 0):
 			outfile.write(key+value)
 		else:
 			file_count+=1
@@ -903,8 +960,7 @@ def update():
 	os.listdir(args.target_directory.rstrip('/')+'/update_tmp') if file.endswith('_orfs.fna') \
 	and file.startswith('split_')]
 
-	processes=10
-	multiprocess(annotate_orfs, processes, orf_files)
+	multiprocess(annotate_orfs, args.processes, orf_files)
 
 	#Create a temporary summary file containing the line id
 	with open(args.target_directory.rstrip('/')+'/update_tmp/all_annos.fna_tmp', 'w') as outfile:
@@ -963,8 +1019,12 @@ def annotate(queue):
 			if not os.path.exists(fa_file.replace(ending, '_annotated.csv')):
 				print('Annotating %s...' % os.path.basename(fa_file))
 				#Use diamond to annotate genes with custom thresholds. Accept only one hit per target
-				diamond_blast='diamond blastx -p 30 -d %s -q %s -o %s --id %r --more-sensitive --quiet --top 100 --masking 0 --subject-cover %r -f 6 qseqid sseqid stitle pident qstart qend qlen slen length score qseq qframe qtitle' %\
-				(args.database, fa_file, fa_file.replace(ending, '_annotated.csv'), args.identity, args.subject_coverage)
+			if args.processes*split_num>multiprocessing.cpu_count()*2:	
+				threads=int((multiprocessing.cpu_count()*2)/args.processes)
+			else:
+				threads=args.processes
+
+				diamond_blast=f'diamond blastx -p {threads} -d {args.database} -q {fa_file} -o {fa_file.replace(ending, "_annotated.csv")} --id {args.identity} --more-sensitive --quiet --top 100 --masking 0 --subject-cover {args.subject_coverage} -f 6 qseqid sseqid stitle pident qstart qend qlen slen length score qseq qframe qtitle'
 				subprocess.call(diamond_blast, shell=True)
 
 				#Sort by queryID and start position
@@ -1082,7 +1142,7 @@ def create_db(queue):
 			if len(line)>1:
 				org_dict[line.split('\t')[0]]=line.split('\t')[1].rstrip('\n')+' plasmid'	
 
-	if args.custom==True:
+	if args.custom!='False':
 
 		if not 'org_dict' in locals():
 			org_dict={}
@@ -1334,7 +1394,11 @@ def cluster_orfs(orf_file, target_dir):
 			centroid=line.split('>')[1].split('...')[0]
 
 		clust_dict[line.split('>')[1].split('...')[0]]={}
-		clust_dict[line.split('>')[1].split('...')[0]]['centroid']=centroid
+		try:
+			clust_dict[line.split('>')[1].split('...')[0]]['centroid']=centroid
+		except:
+
+			clust_dict[line.split('>')[1].split('...')[0]]['centroid']=line.split('>')[1].split('...')[0]
 	
 	return clust_dict
 
@@ -1355,7 +1419,13 @@ def annotate_orfs(queue):
 				uniprot_db_path=args.uniprot_db
 
 		if not os.path.exists(fa_file.replace('_orfs.fna', '_orfs_annotated.csv')):
-			diamond_call=f'diamond blastp -p 30 -d {uniprot_db_path} -q {fa_file} -o {fa_file.replace("_orfs.fna", "_orfs_annotated.csv")} --id {args.uniprot_cutoff} --more-sensitive \
+
+			if args.processes*split_num>multiprocessing.cpu_count()*2:	
+				threads=int((multiprocessing.cpu_count()*2)/args.processes)
+			else:
+				threads=args.processes
+
+			diamond_call=f'diamond blastp -p {threads} -d {uniprot_db_path} -q {fa_file} -o {fa_file.replace("_orfs.fna", "_orfs_annotated.csv")} --id {args.uniprot_cutoff} --more-sensitive \
 			--max-target-seqs 1 --masking 0 --subject-cover 60 -f 6 qseqid sseqid stitle pident \
 			qstart qend qlen slen length qframe qtitle'
 			subprocess.call(diamond_call, shell=True)
@@ -1370,9 +1440,9 @@ def annotate_orfs(queue):
 
 			#Annotate IS and so on here, with 90% identity
 			if not os.path.exists(fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv')):
-				IS_call='diamond blastp -p 30 -d %s -q %s -o %s --id 90 --more-sensitive \
+				IS_call='diamond blastp -p %r  -d %s -q %s -o %s --id 90 --more-sensitive \
 				--max-target-seqs 1 --masking 0 --subject-cover 90 -f 6 qseqid sseqid stitle pident \
-				qstart qend qlen slen length qframe qtitle' % (is_db_path, fa_file, fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv'))
+				qstart qend qlen slen length qframe qtitle' % (threads, is_db_path, fa_file, fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv'))
 				subprocess.call(IS_call, shell=True)
 
 
@@ -1835,6 +1905,7 @@ def main():
 		print('\n--taxa cannot be specified at the same time as --acc_list, please choose only one option\n')
 		sys.exit()
 
+
 	download_uniprot()
 
 	#Disable for debugging
@@ -1915,8 +1986,7 @@ def main():
 				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
 
 		if len(genome_urls)>=1:
-			processes=10
-			multiprocess(download_new, processes, genome_urls)
+			multiprocess(download_new, args.processes, genome_urls)
 		else:
 			print('No genomes found that fit the provided input, exiting...')
 
@@ -1924,6 +1994,18 @@ def main():
 		print('Fetching plasmids...')
 		download_plasmids()
 
+
+	#make split_num available in other functions	
+	global split_num
+
+	if 1<len(genome_urls)<1000:	
+		split_num=1
+	elif 1000<len(genome_urls)<10000:	
+		split_num=5
+	elif 10000<len(genome_urls)<100000:	
+		split_num=10
+	else:
+		split_num=40
 	#Determine whether split files are already present
 	split_files=[file for file in os.listdir(args.target_directory) if file\
 	.startswith('all_assemblies_') and file.endswith('.csv') and len(file.split('.'))==2]
@@ -1983,7 +2065,7 @@ def main():
 			outfile.write(str(i)+'\t'+line.split('\t')[-6]+'\n')
 
 	#after assigning id, split the file into specified number of smaller fasta files again
-	outfiles=args.split
+	outfiles=args.processes
 	csv_lines=[line for line in open(args.target_directory.rstrip('/')+'/all_flanks.csv_tmp', 'r')]
 
 	line_count=0
@@ -1992,7 +2074,7 @@ def main():
 	'flanking_regions_'+str(file_count)+'.fna', 'w')
 	for line in csv_lines:
 		line_count+=1
-		if line_count<=round((len(csv_lines)/args.split)+0.5, 0):
+		if line_count<=round((len(csv_lines)/args.processes)+0.5, 0):
 			outfile.write('>'+line.split('\t')[0]+'\n'+line.split('\t')[-1])
 		else:
 			file_count+=1
@@ -2006,8 +2088,8 @@ def main():
 	if file.startswith('flanking_regions') and file.endswith('.fna') and not '_orfs' in file]
 
 	#Create a multiprocessing queue from the flanking region files
-	processes=25
-	multiprocess(run_prodigal, processes, flanking_fa)
+	multiprocess(run_prodigal, args.processes, flanking_fa)
+
 
 	#concatenate all orf files into one for clustering
 	concat_command='cat %s/flanking_regions_*_orfs.fna > %s/all_orfs.fna' % \
@@ -2029,7 +2111,7 @@ def main():
 			seq+=line
 			centr_dict[header]=seq
 
-	outfiles=args.split
+	outfiles=split_num
 
 	key_count=0
 	file_count=1
@@ -2037,7 +2119,8 @@ def main():
 	'split_'+str(file_count)+'_orfs.fna', 'w')
 	for key, value in centr_dict.items():
 		key_count+=1
-		if key_count<=round((len(centr_dict)/args.split)+0.5, 0):
+		#Make number of splits dependent on split number, not process number
+		if key_count<=round((len(centr_dict)/split_num)+0.5, 0):
 			outfile.write(key+value)
 		else:
 			file_count+=1
