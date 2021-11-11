@@ -111,7 +111,7 @@ If you have taxonomical information of your sequences this can be provided in a 
 
 # Output files
 
-The following output files will be produced in the specified output directory when running `visualize.py`:
+The following output files will be produced in the specified output directory when running `genview-visualize`:
 
 **annotation_meta.csv** - Contains information on annotated genes in the extracted range of the target gene, such as name, position and sequence
 
