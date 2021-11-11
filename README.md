@@ -3,8 +3,8 @@ A phylogeny based comparative genomics software to analyze the genetic environme
 
 # Installation
 
-GEnView can be downloaded using conda (feature soon available, 11.11.21):
-`conda install --c bioconda genview`
+GEnView can be downloaded using conda (feature in review, 11.11.21):
+`conda install -c bioconda genview`
 
 Alternatively, the code can be downloaded simply through cloning the git repository:
 
