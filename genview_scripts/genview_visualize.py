@@ -157,12 +157,16 @@ def read_db(context_file):
 					gene_dict[id]['cluster_size']=clust_sizes[id]
 				gene_dict[id]['env_genes']={}
 
-			#Insert code here
-			
-
-
 			gene_dict[id]['env_genes'][result[11]]={}
-			gene_dict[id]['env_genes'][result[11]]['env_name']=result[10]
+
+			#Replace prodigal orf with target gene annotation
+			if result[4]-100<result[-3]<result[4]+100 and result[4]\
+			+result[3]-100<result[-2]<result[4]+result[3]+100:
+
+				gene_dict[id]['env_genes'][result[11]]['env_name']=result[0]
+			else:
+				gene_dict[id]['env_genes'][result[11]]['env_name']=result[10]
+
 			gene_dict[id]['env_genes'][result[11]]['env_start']=result[-3]
 			gene_dict[id]['env_genes'][result[11]]['env_stop']=result[-2]
 			gene_dict[id]['env_genes'][result[11]]['env_strand']=result[-1]
@@ -253,7 +257,7 @@ def read_db(context_file):
 				str(value2['env_stop'])+'\t'+value2['env_strand']+'\t'+value2['seq']+'\t'+group+'\n')
 
 				#Vis list
-				vis_list.append([str(key), gene_dict[key]['name'], gene_dict[key]['organism'], gene_dict[key]['assembly'], gene_dict[key]['name'], value2['env_start'], value2['env_stop'], value2['env_strand'], group, value2['seq'], str(key) + '.' + str(gvid)])
+				vis_list.append([str(key), gene_dict[key]['name'], gene_dict[key]['organism'], gene_dict[key]['assembly'], value2['env_name'], value2['env_start'], value2['env_stop'], value2['env_strand'], group, value2['seq'], str(key) + '.' + str(gvid)])
 				if t_key == key:
 					gvid += 1
 				else:
@@ -837,7 +841,7 @@ def create_html(tree_index, meta_file):
 								if int(row_n[0]) == int(row[0]):
 									string += '<div id="'+ str(id) +'_line_info" class="hidden info_box"><button class="exit">X</button><p><strong>GVID:</strong>' + row[0] + '</p><p><strong>Organism:</strong>' + row[2] + '</p><p><strong>Accession:</strong> ' + row[3] + ' </p><textarea id="'+ str(id) +'_gene_sequence">' + '&#62' + row[2].replace(' ', '_') + '_' + row[3] +'&#13;&#10;'+ row_n[1] +'</textarea><button id="'+ str(id) +'" class="copy btn";">Copy</button></div>'           
 					indx = 4
-					if row[0].lower() in row[4].lower():
+					if args.gene.lower() in row[4].lower():
 						color='red'
 						color = 'rgb(201, 0, 0)'
 					elif any(keyword in row[4].lower() for keyword in tnps):
