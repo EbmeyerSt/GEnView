@@ -28,7 +28,7 @@ def parse_arguments():
 	parser.add_argument('-scov', '--subject_coverage', help='minimum coverage for a hit to be saved to db (e.g 80 for 80%% cutoff)', type=float, default=90)
 	parser.add_argument('--update', help=argparse.SUPPRESS, action='store_true')
 	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False, action='store_true')
-	parser.add_argument('--uniprot_db', help='path to database for annotation of surrounding sequences. If unspecified default uniprotKB database will be downloaded to target directory', required=False, action='store_true')
+	parser.add_argument('--uniprot_db', help='path to database for annotation of surrounding sequences in ".dmnd" format. If unspecified default uniprotKB database will be downloaded to target directory', required=False, default='False')
 	parser.add_argument('--uniprot_cutoff', help='%% identity threshold for annotating orfs aurrounding the target sequence, default 60', default=60)
 	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+', default='False')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
@@ -45,7 +45,7 @@ def parse_arguments():
 def download_uniprot():
 
 	#Check if gdown is installed
-	if not args.uniprot_db:
+	if args.uniprot_db=='False':
 		try:
 			import gdown
 
@@ -560,12 +560,7 @@ def download_plasmids():
 	plasmid_files=[file for file in os.listdir(args.target_directory.rstrip('/')+\
 	'/plasmids_tmp') if file.endswith('.genomic.fna')]
 
-	#Determine number of cpus to use
-	max_cpu=multiprocessing.cpu_count()
-	if len(plasmid_files)>max_cpu:
-		plas_procs=max_cpu
-	else:
-		plas_procs=len(plasmid_files)
+	plas_procs=args.processes
 
 
 	plas_dict=Manager().dict()
@@ -1412,11 +1407,14 @@ def annotate_orfs(queue):
 	while True:
 
 		#Annotate orfs
-		if not args.uniprot_db:
+		if args.uniprot_db=='False':
 			uniprot_db_path=args.target_directory.rstrip('/')+'/uniprotKB.dmnd'
 		else:
 			if args.uniprot_db.endswith('.dmnd'):
 				uniprot_db_path=args.uniprot_db
+			else:
+				print('Please provide --uniprot_db in .dmnd format!\nAborting...')
+				sys.exit()
 
 		if not os.path.exists(fa_file.replace('_orfs.fna', '_orfs_annotated.csv')):
 
@@ -1984,7 +1982,8 @@ def main():
 			else:
 				
 				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
-
+		
+		print(genome_urls)
 		if len(genome_urls)>=1:
 			multiprocess(download_new, args.processes, genome_urls)
 		else:
