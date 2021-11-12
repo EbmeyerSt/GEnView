@@ -11,6 +11,7 @@ def parse_arguments():
 	parser.add_argument('-gene', help='name of gene/orf to extract and visualize', required=True)
 	parser.add_argument('-db', help='genview database created by genview-create-db', required=True)
 	parser.add_argument('-id', help='percent identity threshold for genes to extract', required=True)
+	parser.add_argument('-nodes', help='should nodes be connected to genome with solid line (solid), connected by dashed line (dash) or no connection (none)', default='solid', type=str)
 	parser.add_argument('-taxa', help='list of genera and/or species to extract\nBy default all taxa are extracted', default=False, nargs='+')
 	parser.add_argument('--force', help='Force new alignment and phylogeny', action='store_true')
 	parser.add_argument('--compressed', help='Compress number of displayed sequences, helpful with large number of identical sequences', action='store_true')
@@ -156,6 +157,10 @@ def read_db(context_file):
 					gene_dict[id]['cluster_size']=clust_sizes[id]
 				gene_dict[id]['env_genes']={}
 
+			#Insert code here
+			
+
+
 			gene_dict[id]['env_genes'][result[11]]={}
 			gene_dict[id]['env_genes'][result[11]]['env_name']=result[10]
 			gene_dict[id]['env_genes'][result[11]]['env_start']=result[-3]
@@ -206,8 +211,7 @@ def read_db(context_file):
 		for key, value in gene_dict.items():
 
 			outfile.write('_'*20+'\n'+gene_dict[key]['name']+'__'+str(key)+'__'+gene_dict[key]['organism']+\
-			'__'+gene_dict[key]['assembly']+'\n'+'-'*20+'\n'
-			)
+			'__'+gene_dict[key]['assembly']+'\n'+'-'*20+'\n')
 
 			position_list=[]
 			lines=[]
@@ -249,7 +253,7 @@ def read_db(context_file):
 				str(value2['env_stop'])+'\t'+value2['env_strand']+'\t'+value2['seq']+'\t'+group+'\n')
 
 				#Vis list
-				vis_list.append([str(key), gene_dict[key]['name'], gene_dict[key]['organism'], gene_dict[key]['assembly'], value2['env_name'], value2['env_start'], value2['env_stop'], value2['env_strand'], group, value2['seq'], str(key) + '.' + str(gvid)])
+				vis_list.append([str(key), gene_dict[key]['name'], gene_dict[key]['organism'], gene_dict[key]['assembly'], gene_dict[key]['name'], value2['env_start'], value2['env_stop'], value2['env_strand'], group, value2['seq'], str(key) + '.' + str(gvid)])
 				if t_key == key:
 					gvid += 1
 				else:
@@ -666,19 +670,25 @@ def create_tree_index(tree_file_path):
 		mx -= 1
 			
 	#Add stipple lines to nodes
-	i = 1
-	while i < len(new_tree[:-1]):
-		n = len(new_tree[0])-3
-		while n >= 0:
-			if new_tree[i][n-2] == 1:
-				break
-			else:
-				new_tree[i][n] = 1
-				new_tree[i][n-1] = 1
-			n -= 4
-		i += 2
+	if args.nodes != 'none':
+		if args.nodes == 'dash' or args.nodes == 'solid':
+			i = 1
+			while i < len(new_tree[:-1]):
+				n = len(new_tree[0])-3
+				while n >= 0:
+					if new_tree[i][n-2] == 1:
+						break
+					else:
+						new_tree[i][n] = 1
+						new_tree[i][n-1] = 1
+						if args.nodes == 'solid':
+							new_tree[i][n-2] = 1
+					if args.nodes == 'dash':
+						n -= 4
+					elif args.nodes == 'solid':
+						n -= 1
+				i += 2
 
-	#make_text(new_tree)
 	return [new_tree, final_order]
 
 
@@ -733,7 +743,7 @@ def create_tree_lines(tree_index, y_val, size, width=300):
 	tree_string += '</svg>'
 	return tree_string
 
-def create_html(tree_index): 
+def create_html(tree_index, meta_file): 
 	#Create Phylo Tree
 	tree = tree_index[0]
 	tree_string = ''
@@ -742,7 +752,7 @@ def create_html(tree_index):
 	tree_string += create_tree_lines(tree, 4, 's_tree')
 
 	#Get max sequence length
-	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv', newline = '') as org_file:
+	with open(meta_file, newline = '') as org_file:
 		reader = list(csv.reader(org_file))[1:]
 		values = []
 		org = []
@@ -778,7 +788,7 @@ def create_html(tree_index):
 	name_string = ''
 	name_string += '<div class="names" style="grid-column-start: 2; grid-column-end: 3;grid-row-start: 1;grid-row-end: 2;"><div class="grid_container">'
 	#Create names
-	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv', newline = '') as file:
+	with open(meta_file, newline = '') as file:
 		reader = list(csv.reader(file))[1:]
 		start = 1
 		stop = 5
@@ -804,7 +814,7 @@ def create_html(tree_index):
 
 
 	#Create genetic environment
-	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv', newline = '') as file:
+	with open(meta_file, newline = '') as file:
 		reader = list(csv.reader(file))[1:]
 		key = 0
 		id = 0
@@ -821,15 +831,18 @@ def create_html(tree_index):
 							string += '</div>'
 						string += '<div class="grid_container">'
 						string += '<div id="' + str(id) + '_line" class="line" style="grid-column: 1 / ' + str(math.ceil(int(high)*factor)) + ';grid-row: 2 / 4;background-color: rgba(0, 0, 0);opacity: 0.2;"></div>'
-						with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/../'+'all_flanks.csv_tmp') as file:
+						with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/../'+'all_flanks.csv_tmp') as file:	
 							seq_reader = csv.reader(file, delimiter='\t')
 							for row_n in seq_reader:
 								if int(row_n[0]) == int(row[0]):
 									string += '<div id="'+ str(id) +'_line_info" class="hidden info_box"><button class="exit">X</button><p><strong>GVID:</strong>' + row[0] + '</p><p><strong>Organism:</strong>' + row[2] + '</p><p><strong>Accession:</strong> ' + row[3] + ' </p><textarea id="'+ str(id) +'_gene_sequence">' + '&#62' + row[2].replace(' ', '_') + '_' + row[3] +'&#13;&#10;'+ row_n[1] +'</textarea><button id="'+ str(id) +'" class="copy btn";">Copy</button></div>'           
 					indx = 4
-					if any(keyword in row[4].lower() for keyword in tnps):
-						color='violet'
-						color = 'rgb(0, 181, 253)'
+					if row[0].lower() in row[4].lower():
+						color='red'
+						color = 'rgb(201, 0, 0)'
+					elif any(keyword in row[4].lower() for keyword in tnps):
+						color='purple'
+						color = 'rgb(201, 50, 255)'
 					elif any(keyword in row[4].lower() for keyword in ints):
 						color='yellow'
 						color = 'rgb(253, 228, 0)'
@@ -844,8 +857,8 @@ def create_html(tree_index):
 						color='grey'
 						color = 'rgb(153, 153, 153)'
 					else:
-						color='purple'
-						color = 'rgb(153, 0, 255)'
+						color='orange'
+						color = 'rgb(244, 153, 50)'
 
 					start = math.ceil(int(row[5])*factor)
 					end = math.ceil(int(row[6])*factor)
@@ -960,7 +973,7 @@ def main():
 	#Create index phylogenetic tree f
 	final_tree = create_tree_index(context_file[0].replace('.fna', '.unique.tree'))
 	#Create html of phylogenetic tree and corresponding sequences
-	output = create_html(final_tree)
+	output = create_html(final_tree, os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv')
 	#Write HTML output file
 	write_output(output, os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis')
 	exit()
