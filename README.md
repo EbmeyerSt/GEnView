@@ -14,7 +14,7 @@ Alternatively, the code can be downloaded simply through cloning the git reposit
 
 We recommend to set up a virtual environment and install all dependencies to run GEnView there.
 
-* Python =3.6
+* Python >=3.6
   * pandas >=1.0.3
   * sqlite3 >=2.6
   * Biopython >=1.68
