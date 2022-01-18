@@ -160,8 +160,8 @@ def read_db(context_file):
 			gene_dict[id]['env_genes'][result[11]]={}
 
 			#Replace prodigal orf with target gene annotation
-			if result[4]-100<result[-3]<result[4]+100 and result[4]\
-			+result[3]-100<result[-2]<result[4]+result[3]+100:
+			if result[4]-200<result[-3]<result[4]+200 and result[4]\
+			+result[3]-200<result[-2]<result[4]+result[3]+200:
 
 				gene_dict[id]['env_genes'][result[11]]['env_name']=result[0]
 			else:
@@ -277,28 +277,6 @@ def read_db(context_file):
 
 	return gene_dict
 
-#def cluster_seqs(context_file):
-
-	#temporarily rewrite context file to remove spaces from names
-#	with open(context_file[0]+'_tmp', 'w') as outfile:
-#		for line in open(context_file[0], 'r'):
-#			if line.startswith('>'):
-#				outfile.write(line.replace(' ', '_'))
-#			else:
-#				outfile.write(line)
-
-	#Use usearch to cluster the sequences at 95%
-#	if not os.path.exists(context_file[0]+'.sorted'):
-#		sort='usearch -sortbylength %s -fastaout %s' % (context_file[0]+'_tmp', context_file[0]+'.sorted')
-#		subprocess.call(sort, shell=True)
-
-#	if not os.path.exists(context_file[0]+'.centroids'):
-#		cluster='usearch -cluster_smallmem %s -id 0.95 -centroids %s -uc %s' % \
-#		(context_file[0]+'.sorted', context_file[0]+'.centroids', context_file[0]+'.clusters')
-#		subprocess.call(cluster, shell=True)
-
-	#remove tmp_file
-#	os.remove(context_file[0]+'_tmp')
 
 def cluster_profiles(profiles):
 	
@@ -760,12 +738,12 @@ def create_html(tree_index, meta_file):
 		reader = list(csv.reader(org_file))[1:]
 		values = []
 		org = []
-		key = 1
+		key = int(reader[0][0])
 		for row in reader:
 			if key == int(row[0]):
 				org.append([int(row[0]), int(row[6])])                
 			else:
-				key += 1
+				key = int(row[0])
 				values.append(org)
 				org = []
 				org.append([int(row[0]), int(row[6])]) 
@@ -774,16 +752,16 @@ def create_html(tree_index, meta_file):
 	vals = []
 	final = []
 	tmp_vals = []
-	key = 1
+	key = values[0][0][0]
 	for item in values:
 		for i in item:
 			vals.append(i[1])
 			if key == int(i[0]):
 				tmp_vals.append(i[1])
 			else:
-				final.append([int(i[0])-1, max(tmp_vals)])
+				final.append([key, max(tmp_vals)])
 				tmp_vals = []
-				key += 1
+				key = int(i[0])
 				tmp_vals.append(i[1])
 	final.append([int(i[0]), max(tmp_vals)])
 	factor = 1000/max(vals)
@@ -854,7 +832,7 @@ def create_html(tree_index, meta_file):
 						color='green'
 						color = 'rgba(0, 255, 13)'
 					elif any(keyword in row[4].lower() for keyword in res):
-						indx = 1
+						indx = 4
 						color='DodgerBlue'
 						color = 'rgba(0, 183, 255)'
 					elif 'hypothetical' in row[4].lower():
@@ -980,6 +958,7 @@ def main():
 	output = create_html(final_tree, os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv')
 	#Write HTML output file
 	write_output(output, os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis')
+	print('Visualization ready!')
 	exit()
 
 if __name__=='__main__':

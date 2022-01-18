@@ -147,21 +147,16 @@ def reverse_complement(seq):
 
 def download_new(queue):
 
+	if args.update==True:
+		target_dir=args.target_directory.rstrip('/')+'/'+'update_tmp/genomes'
+	else:
+
+		target_dir=args.target_directory.rstrip('/')+'/genomes'
+
 	#download newly published genomes
 	url=queue.get()
 	if url=='STOP':
 		return
-
-	if args.update==True:
-		#Set target directory to temporary update directory
-		if not os.path.exists(args.target_directory.rstrip('/')+'/'+'update_tmp/genomes'):
-			os.mkdir(args.target_directory.rstrip('/')+'/'+'update_tmp/genomes')
-		target_dir=args.target_directory.rstrip('/')+'/'+'update_tmp/genomes'
-	else:
-
-		if not os.path.exists(args.target_directory.rstrip('/')+'/genomes'):
-			os.mkdir(args.target_directory.rstrip('/')+'/genomes')
-		target_dir=args.target_directory.rstrip('/')+'/genomes'
 
 	while True:
 
@@ -223,10 +218,10 @@ def split_fasta():
 		if iterated_lines==1:
 			outfile=open(target_dir+'/all_assemblies_'+str(multiplicator)+'.fna', 'w')
 
-		if iterated_lines<=(line_num/args.processes)*multiplicator:	
+		if iterated_lines<=(line_num/split_num)*multiplicator:	
 			outfile.write(line)
 
-		elif iterated_lines>=(line_num/args.processes)*multiplicator and previous_complete==False:
+		elif iterated_lines>=(line_num/split_num)*multiplicator and previous_complete==False:
 			outfile.write(line)
 		else:
 			multiplicator+=1
@@ -260,7 +255,7 @@ def concatenate_and_split():
 				outfile.write('\n')
 	
 	#Split fasta file into smaller files
-	print('Splitting into %d files...' % args.processes)
+	print('Splitting into %d files...' % split_num)
 	split_fasta()
 
 	#Create .csv version of each file
@@ -659,13 +654,13 @@ def download_plasmids():
 				#Filter by taxonomy:
 				if key in genome_accessions and key in new_plas_accs:
 					hits+=1
-					with open(args.target_directory.rstrip('/')+'/update_tmp/'\
+					with open(args.target_directory.rstrip('/')+'/update_tmp/genomes/'\
 					+key+'_genomic.fna', 'w') as outfile:
 						outfile.write('>'+key+' plasmid\n'+value['seq'])
 
 		else:
 
-			if not args.taxa=='all':
+			if not args.taxa[0]=='all':
 				hits=0
 				for key, value in new_plasmid_dict.items():
 					#Filter by taxonomy:
@@ -673,7 +668,7 @@ def download_plasmids():
 					in args.taxa) and key in new_plas_accs:
 
 						hits+=1
-						with open(args.target_directory.rstrip('/')+'/update_tmp/'\
+						with open(args.target_directory.rstrip('/')+'/update_tmp/genomes/'\
 						+key+'_genomic.fna', 'w') as outfile:
 							outfile.write('>'+key+' plasmid\n'+value['seq'])
 				
@@ -686,7 +681,7 @@ def download_plasmids():
 			else:
 				for key, value in new_plasmid_dict.items():
 					if key in new_plas_accs:
-						with open(args.target_directory.rstrip('/')+'/update_tmp/'\
+						with open(args.target_directory.rstrip('/')+'/update_tmp/genomes/'\
 						+key+'_genomic.fna', 'w') as outfile:
 							outfile.write('>'+key+' plasmid\n'+value['seq'])
 
@@ -700,11 +695,11 @@ def download_plasmids():
 				#Filter by taxonomy:
 				if key in genome_accessions and key in new_plas_accs:
 					hits+=1
-					with open(args.target_directory.rstrip('/')+'/update_tmp/'\
+					with open(args.target_directory.rstrip('/')+'/update_tmp/genomes/'\
 					+key+'_genomic.fna', 'w') as outfile:
 						outfile.write('>'+key+' plasmid\n'+value['seq'])
 		else:
-			if not args.taxa=='all':
+			if not args.taxa[0]=='all':
 				hits=0
 				for key, value in new_plasmid_dict.items():
 					#Filter by taxonomy:
@@ -712,7 +707,7 @@ def download_plasmids():
 					in args.taxa):
 
 						hits+=1
-						with open(args.target_directory.rstrip('/')+'/'\
+						with open(args.target_directory.rstrip('/')+'/genomes/'\
 						+key+'_genomic.fna', 'w') as outfile:
 							outfile.write('>'+key+' plasmid\n'+value['seq'])
 				
@@ -724,7 +719,7 @@ def download_plasmids():
 						sys.exit()
 			else:
 				for key, value in new_plasmid_dict.items():
-					with open(args.target_directory.rstrip('/')+'/'\
+					with open(args.target_directory.rstrip('/')+'/genomes/'\
 					+key+'_genomic.fna', 'w') as outfile:
 						outfile.write('>'+key+' plasmid\n'+value['seq'])
 
@@ -817,7 +812,7 @@ def update():
 			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if key.lower() in genome_accessions]
 		
 		else:
-			if not args.taxa=='all':
+			if not args.taxa[0]=='all':
 
 				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if any(taxon.lower() in \
 				' '.join(asm_dict[key]['sci_lineage']).lower() for taxon in args.taxa)]
@@ -1913,6 +1908,17 @@ def main():
 	if not os.path.exists(args.target_directory):
 		os.mkdir(args.target_directory)
 
+	
+	#Create directory to store sequence data
+	if args.update==True:
+		#Set target directory to temporary update directory
+		if not os.path.exists(args.target_directory.rstrip('/')+'/'+'update_tmp/genomes'):
+			os.mkdir(args.target_directory.rstrip('/')+'/'+'update_tmp/genomes')
+	else:
+
+		if not os.path.exists(args.target_directory.rstrip('/')+'/genomes'):
+			os.mkdir(args.target_directory.rstrip('/')+'/genomes')
+
 	#Download NCBI taxonomy files for lineage assignment
 	if not os.path.exists(args.target_directory.rstrip('/')+'/taxonomy'):
 		os.mkdir(args.target_directory.rstrip('/')+'/taxonomy')
@@ -1976,14 +1982,13 @@ def main():
 			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if key.lower() in genome_accessions]
 
 		else:
-			if not args.taxa=='all':
+			if not args.taxa[0]=='all':
 				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if any(taxon.lower() in \
 				' '.join(asm_dict[key]['sci_lineage']).lower() for taxon in args.taxa)]
 			else:
 				
 				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
 		
-		print(genome_urls)
 		if len(genome_urls)>=1:
 			multiprocess(download_new, args.processes, genome_urls)
 		else:
@@ -2002,9 +2007,9 @@ def main():
 	elif 1000<len(genome_urls)<10000:	
 		split_num=5
 	elif 10000<len(genome_urls)<100000:	
-		split_num=10
+		split_num=20
 	else:
-		split_num=40
+		split_num=100
 	#Determine whether split files are already present
 	split_files=[file for file in os.listdir(args.target_directory) if file\
 	.startswith('all_assemblies_') and file.endswith('.csv') and len(file.split('.'))==2]
@@ -2025,6 +2030,11 @@ def main():
 	and fa_file.endswith('.fna') and not fa_file.startswith('flanking') \
 	and not '_orfs' in fa_file]
 	
+	#Delete 'all_assemblies.fna' at this stage to free up storage space
+	all_assembliesfna=[args.target_directory.rstrip('/')+'/'+fa_file for fa_file \
+	in os.listdir(args.target_directory) if fa_file==('all_assemblies.fna')]
+	os.remove(all_assembliesfna[0])
+
 	#Define number of processes and empty list for processes
 	multiprocess(annotate, args.processes, fa_files)
 	#Do the same again for the 'create_database' function
