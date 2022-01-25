@@ -1,8 +1,6 @@
 # GEnView
 A phylogeny based comparative genomics software to analyze the genetic environment of genes. The user can select one or several taxa and provide one or several reference protein(s). Genomes and plasmids (based on user choice) will be downloaded from the NCBI Assembly/NR database and searched for the respective gene. Alternatively, custom genomes can be provided. User selected stretches (20kbp by default) of the genes genetic environment are extracted, annotated and aligned between all genomes. The sequences are then visualized, enabling comparison of synteny and gene content.
 
-# Current Bug:
-We identified a bug in GEnView that throws an error in the visualization command if you had more than one gene in your reference database. A patch is implemented in the newest release (v.0.1.1), until that is updated on bioconda you can circumvent the issue by just searching your target genomes for one reference gene. 
 
 # Installation
 
