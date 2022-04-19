@@ -12,9 +12,11 @@ def parse_arguments():
 	parser.add_argument('-db', help='genview database created by genview-create-db', required=True)
 	parser.add_argument('-id', help='percent identity threshold for genes to extract', required=True)
 	parser.add_argument('-nodes', help='should nodes be connected to genome with solid line (solid), connected by dashed line (dash) or no connection (none)', default='solid', type=str)
-	parser.add_argument('-taxa', help='list of genera and/or species to extract\nBy default all taxa are extracted', default=False, nargs='+')
+	parser.add_argument('-taxa', help='list of genera and/or species to extract\nBy default all taxa are extracted', default='False', nargs='+')
 	parser.add_argument('--force', help='Force new alignment and phylogeny', action='store_true')
 	parser.add_argument('--compressed', help='Compress number of displayed sequences, helpful with large number of identical sequences', action='store_true')
+	parser.add_argument('--custom_colors', help='path to file containing RGB color codes for gene color customization', default='False')
+	parser.add_argument('--log', help='Write log file', action='store_true')
 	args=parser.parse_args()
 
 	return args
@@ -38,18 +40,21 @@ def extract():
 	AND args.perc_id >= {float(args.id)} \
 	"""
 
-	if args.taxa!=False:
+	if args.taxa!='False':
 		i=0
 		for taxon in args.taxa:
+			print(taxon)
 			i+=1
 			if len(args.taxa)>1:
-				if i==1:
+				if i==1 and args.taxa>1:
 					query+='AND ('
 					query+=f'genomes.organism LIKE \'{taxon+"%"}\' '
 				elif 1<i<len(args.taxa):
 					query+=f'OR genomes.organism LIKE \'{taxon+"%"}\' '
 				else:
 					query+=f'OR genomes.organism LIKE \'{taxon+"%"}\') '
+			else:
+				query+=f'AND genomes.organism LIKE \'{taxon+"%"}\' '
 
 
 	cursor.execute(query)
@@ -72,6 +77,13 @@ def extract():
 		for result in results:
 			outfile.write('>'+result[0]+'__'+str(result[1])+'__'+result[2]\
 			+'\n'+flank_dict[str(result[1])]+'\n')
+		
+	if args.log==True:
+		if len([line for line in open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis/'+args.gene+'_contexts.fna', 'w') if line.startswith('>')])>=2:
+			log_lines.append('Target sequences extracted...\n'):
+		else:
+			log_lines.append('No/too few target sequences extracted...FAILED\n')
+		write_log()
 
 def read_db(context_file):
 
@@ -234,25 +246,37 @@ def read_db(context_file):
 			for key2, value2 in value['env_genes'].items():
 				#add group (e.g transposon,integron, etc.)
 				group_assigned=0
-				if any(keyword.lower() in value2['env_name'].lower() for keyword in tnps):
-					group='transposase'
-					group_assigned=1
-				if any(keyword.lower() in value2['env_name'].lower() for keyword in ints):
-					group='integron'
-					group_assigned=1
-				if any(keyword.lower() in value2['env_name'].lower() for keyword in mobiles):
-					group='mobile'
-					group_assigned=1
-				if any(keyword.lower() in value2['env_name'].lower() for keyword in res):
-					group='resistance'
-					group_assigned=1
-				if 'hypothetical' in value2['env_name'].lower():
-						group='hypothetical'
+				if not args.custom_colors==True:
+					if any(keyword.lower() in value2['env_name'].lower() for keyword in tnps):
+						group='transposase'
 						group_assigned=1
+					if any(keyword.lower() in value2['env_name'].lower() for keyword in ints):
+						group='integron'
+						group_assigned=1
+					if any(keyword.lower() in value2['env_name'].lower() for keyword in mobiles):
+						group='mobile'
+						group_assigned=1
+					if any(keyword.lower() in value2['env_name'].lower() for keyword in res):
+						group='resistance'
+						group_assigned=1
+					if 'hypothetical' in value2['env_name'].lower():
+							group='hypothetical'
+							group_assigned=1
 
-				if not group_assigned==1:
-					group='misc'
+					if not group_assigned==1:
+						group='misc'
+				
+				else:
+					cust_groups=[line.rstrip('\n') for line in open(args.custom_colors, 'r')]	
+					for cust_group in cust_groups:
+						if any(keyword.lower() in value2['env_name'].lower() for keyword in \
+						cust_group.split('\t')[1]):
+							group=cust_group.split('\t')[0]
+							group_assigned=1
 
+					if not group_assigned==1:
+						group='misc'
+					
 				lines.append(value2['env_name']+'\t'+str(value2['env_start'])+'\t'+\
 				str(value2['env_stop'])+'\t'+value2['env_strand']+'\t'+value2['seq']+'\t'+group+'\n')
 
@@ -274,6 +298,13 @@ def read_db(context_file):
 	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv', 'w') as outfile:
 		write = csv.writer(outfile) 
 		write.writerows(vis_list) 
+
+	if args.log==True:
+		if len(gene_dict)>=2:
+			log_lines.append('Genetic environments extracted and visualization metadata created...\n')
+		else:
+			log_lines.append('Could not extract genetic environments/create visualization metadata...FAILED\n')
+		write_log()
 
 	return gene_dict
 
@@ -302,6 +333,14 @@ def cluster_profiles(profiles):
 		identical_profiles.append(duplicates)
 
 	unique_profiles=[profiles[0] for profiles in identical_profiles]
+
+	if args.log==True:
+		if len(unique_profiles)>=2:
+			log_lines.append('Unique profiles identified...\n')
+		else:
+			log_lines.append('Unique profiles could not be identified...\n')
+		write_log()
+
 	return unique_profiles
 
 
@@ -328,28 +367,48 @@ def align(context_file, unique_profiles):
 
 	#Write unique context to extra file
 	with open(context_file[0].replace('.fna', '.unique.fna'), 'w') as outfile:
+		print('Removing special characters in sequence headers...')
 		for key, value in seq_dict.items():
 			if str(key.split('__')[1]) in unique_ids:
-				outfile.write('>'+key.replace(' ', '_')+'\n'+value+'\n')
+				new_entry='>'+key.replace(' ', '_').replace('(', '').replace(')', '')\
+				.replace('"','').replace("'", "").replace('*', '')\
+				.replace('/', '').replace('|', '')+'\n'+value+'\n'
+				outfile.write(new_entry)
+
 
 	#Create mafft alignment of unique sequences
-	if not os.path.exists(context_file[0].replace('.fna', '.unique.aln')) or args.force == True:
+	if not os.path.exists(context_file[0].replace('.fna', '.unique.aln').replace('(', '\(').replace(')', '\)')) or args.force == True:
 	
 		align='mafft --auto --reorder --thread %r  %s > %s' \
-		% (multiprocessing.cpu_count(), context_file[0].replace('.fna', '.unique.fna'), context_file[0]\
-		.replace('.fna', '.unique.aln'))
+		% (multiprocessing.cpu_count(), context_file[0].replace('.fna', '.unique.fna').replace('(', '\(').replace(')', '\)'), context_file[0]\
+		.replace('.fna', '.unique.aln').replace('(', '\(').replace(')', '\)'))
 
 		subprocess.call(align, shell=True)
+
+	if args.log==True:
+		if os.path.exists(context_file[0].replace('.fna', '.unique.aln').replace('(', '\(').replace(')', '\)')) and\
+		 os.path.getsize(context_file[0].replace('.fna', '.unique.aln').replace('(', '\(').replace(')', '\)'))>0:
+			log_lines.append('Sequences aligned...\n')
+		else:
+			log_lines.append('Sequence alignment failed...FAILED\n')
+		write_log()
 	
 	#Create Phylogeny
-	if not os.path.exists(context_file[0].replace('.fna', '.unique.tree')) or args.force == True:
+	if not os.path.exists(context_file[0].replace('.fna', '.unique.tree').replace('(', '\(').replace(')', '\)')) or args.force == True:
 		
 		phylogeny='FastTree -gtr -nt < %s > %s' % \
-		(context_file[0].replace('.fna', '.unique.aln'), \
-		context_file[0].replace('.fna', '.unique.tree'))
+		(context_file[0].replace('.fna', '.unique.aln').replace('(', '\(').replace(')', '\)'), \
+		context_file[0].replace('.fna', '.unique.tree').replace('(', '\(').replace(')', '\)'))
 
 		subprocess.call(phylogeny, shell=True)
 
+		if args.log==True:
+			if os.path.exists(context_file[0].replace('.fna', '.unique.tree').replace('(', '\(').replace(')', '\)')) and\
+			 os.path.getsize(context_file[0].replace('.fna', '.unique.tree').replace('(', '\(').replace(')', '\)'))>0:
+				log_lines.append('Phylogeny created...\n')
+			else:
+				log_lines.append('Phylogeny could not be created...FAILED\n')
+			write_log()
 
 
 ###HTML VERSION###
@@ -819,28 +878,37 @@ def create_html(tree_index, meta_file):
 								if int(row_n[0]) == int(row[0]):
 									string += '<div id="'+ str(id) +'_line_info" class="hidden info_box"><button class="exit">X</button><p><strong>GVID:</strong>' + row[0] + '</p><p><strong>Organism:</strong>' + row[2] + '</p><p><strong>Accession:</strong> ' + row[3] + ' </p><textarea id="'+ str(id) +'_gene_sequence">' + '&#62' + row[2].replace(' ', '_') + '_' + row[3] +'&#13;&#10;'+ row_n[1] +'</textarea><button id="'+ str(id) +'" class="copy btn";">Copy</button></div>'           
 					indx = 4
-					if args.gene.lower() in row[4].lower():
-						color='red'
-						color = 'rgb(201, 0, 0)'
-					elif any(keyword in row[4].lower() for keyword in tnps):
-						color='purple'
-						color = 'rgb(201, 50, 255)'
-					elif any(keyword in row[4].lower() for keyword in ints):
-						color='yellow'
-						color = 'rgb(253, 228, 0)'
-					elif any(keyword in row[4].lower() for keyword in mobiles):
-						color='green'
-						color = 'rgba(0, 255, 13)'
-					elif any(keyword in row[4].lower() for keyword in res):
-						indx = 4
-						color='DodgerBlue'
-						color = 'rgba(0, 183, 255)'
-					elif 'hypothetical' in row[4].lower():
-						color='grey'
-						color = 'rgb(153, 153, 153)'
+					if args.custom_colors=='False':	
+						if args.gene.lower() in row[4].lower():
+							color='red'
+							color = 'rgb(201, 0, 0)'
+						elif any(keyword in row[4].lower() for keyword in tnps):
+							color='purple'
+							color = 'rgb(201, 50, 255)'
+						elif any(keyword in row[4].lower() for keyword in ints):
+							color='yellow'
+							color = 'rgb(253, 228, 0)'
+						elif any(keyword in row[4].lower() for keyword in mobiles):
+							color='green'
+							color = 'rgba(0, 255, 13)'
+						elif any(keyword in row[4].lower() for keyword in res):
+							indx = 4
+							color='DodgerBlue'
+							color = 'rgba(0, 183, 255)'
+						elif 'hypothetical' in row[4].lower():
+							color='grey'
+							color = 'rgb(153, 153, 153)'
+						else:
+							color='orange'
+							color = 'rgb(244, 153, 50)'
 					else:
-						color='orange'
-						color = 'rgb(244, 153, 50)'
+						
+						cust_groups=[line.rstrip('\n') for line in open(args.custom_colors, 'r')]	
+						color='rgb(244, 153, 50)'
+						for cust_group in cust_groups:
+							if any(keyword.lower() in row[4].lower() for keyword in \
+							cust_group.split('\t')[1].split(',')):
+								color=cust_group.split('\t')[2]
 
 					start = math.ceil(int(row[5])*factor)
 					end = math.ceil(int(row[6])*factor)
@@ -922,12 +990,33 @@ def write_output(output, output_dir):
 	f.write('\n')
 	f.close()
 
+	if args.log==True:
+		if os.path.exists(output_dir +"/interactive_visualization.html") and os.path.getsize(output_dir +"/interactive_visualization.html")>0:
+			log_lines.append('Interactive visualization created!\n')
+		else:
+			log_lines.append('Visualization could not be created...FAILED\n')
+		write_log()
+
+def check_color_format():
+	
+	cust_lines=[line.rstrip('\n') for line in open(args.custom_colors, 'r')]
+	splits=cust_lines[0].split('\t')
+
+	if not len(splits)==3:
+		print('\n'+f'Incorrect file format detected for {args.custom_colors}.'+'\nFormat should be class\\tkeyword1,keyword2\\trgbcolor\\n\n')	
+		sys.exit()
 
 def main():
 
 	global args
 	args=parse_arguments()
 
+	if args.log==True:
+		global log_lines
+		log_lines=[]
+
+	if not args.custom_colors=='False':
+		check_color_format()
 	#Extract genes from db
 	extract()
 	#Extract file containing flanking regions
@@ -960,6 +1049,12 @@ def main():
 	write_output(output, os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis')
 	print('Visualization ready!')
 	exit()
+
+def write_log()
+	
+	with open(f'{os.path.abspath(args.target_directory)}/genview_viz.log', 'w') as outfile:
+		for line in log_lines:
+			outfile.write(line)
 
 if __name__=='__main__':
 	main()
