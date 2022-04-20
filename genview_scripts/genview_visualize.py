@@ -1050,7 +1050,7 @@ def main():
 	print('Visualization ready!')
 	exit()
 
-def write_log()
+def write_log():
 	
 	with open(f'{os.path.abspath(args.target_directory)}/genview_viz.log', 'w') as outfile:
 		for line in log_lines:
