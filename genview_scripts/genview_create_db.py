@@ -1200,7 +1200,7 @@ def update():
 				genome_urls.extend([line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0')])
 		else:
 			if args.taxa!='False':
-				genome_urls=[line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0') if any(taxa for taxa in taxon)]
+				genome_urls=[line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0') if any(taxa for taxa in args.taxa)]
 			else:
 				genome_urls=[line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0')]
 
