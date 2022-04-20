@@ -84,7 +84,7 @@ def download_uniprot():
 
 		#Check if download was succesfull
 		if not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna'):
-			print('\nDownload of the uniprot database failed, possibly due to exceeded bandwith limit on storage.\nPlease try again in a few hours or download the database manually from "https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc".\nTo convert the file into a diamond database, unzip it using gzip and then run "diamondmakedb --in databasefile.fa -d yourdbname.dmnd".\nIf possible, use a version of the database created by a previous run.\n')
+			print('\nDownload of the uniprot database failed, possibly due to exceeded bandwith limit on storage.\nPlease try again in a few hours or download the database manually from "https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc".\nTo convert the file into a diamond database, unzip it using gzip and then run "diamond makedb --in databasefile.fa -d yourdbname.dmnd".\nIf possible, use a version of the database created by a previous run.\n')
 			sys.exit()
 
 		#Transform to diamond database
@@ -3028,7 +3028,7 @@ def remove_tmps():
 	
 	#Also remove downloaded genomes
 	if os.path.exists(f'{os.path.abspath(args.target_directory)}/genomes'):
-		shutil.rmtree('{os.path.abspath(args.target_directory)}/genomes')
+		shutil.rmtree(f'{os.path.abspath(args.target_directory)}/genomes')
 
 	print('temporary files removed!')
 
