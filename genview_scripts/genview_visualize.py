@@ -68,6 +68,7 @@ def extract():
 	else:
 		print(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'+'exists already!\n\
 				Use --force to overwrite previous results.\n')
+		sys.exit()
 	
 	#Using the id, go back to the file containing the flanking regions and extract the ones matching the ids 
 	flank_dict={}
