@@ -84,7 +84,7 @@ def download_uniprot():
 
 		#Check if download was succesfull
 		if not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna'):
-			print('\nDownload of the uniprot database failed, possibly due to exceeded bandwith limit on storage.\nPlease try again in a few hours or download the database manually from "https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc".\nTo convert the file into a diamond database, unzip it using gzip and then run "diamond makedb --in databasefile.fa -d yourdbname.dmnd".\nIf possible, use a version of the database created by a previous run.\n')
+			print('\nDownload of the uniprot database failed, possibly due to exceeded bandwith limit on storage.\nPlease try again in a few hours or download the database manually from "https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc".\nTo convert the file into a diamond database, unzip it using "gunzip filename.gz" and then run "diamond makedb --in databasefile.fa -d yourdbname.dmnd".\nSpecify the path to the so created database using --uniprot_db.\nIf possible, use a version of the database created by a previous run.\n')
 			sys.exit()
 
 		#Transform to diamond database
@@ -2462,6 +2462,10 @@ def main():
 
 	global args
 	args=parse_arguments()
+
+	if not os.path.exists(args.target_directory):
+		print('Target directory does not exist, creating...')
+		os.mkdir(args.target_directory)
 
 	if args.clean==True and args.update==True:
 		print('Output from previous run is required for update, --clean and --update cannot be specified at the same time!')
