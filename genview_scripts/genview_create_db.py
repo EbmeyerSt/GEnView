@@ -2522,7 +2522,7 @@ def main():
 		#Check if target directory contains files from a previous run
 		targetdir_files=[file for file in os.listdir(args.target_directory)]
 		if ('all_annos.fna_tmp' or 'all_flanks.csv_tmp' or 'all_orfs.fna' or 'assembly_summary.txt' or \
-		'genview_database.db' or 'genview.log' or 'orfs_clustered.fna' or 'plasmid_summary.txt.0') in \
+		'genview_database.db' or 'genview.log' or 'orfs_clustered.fna' or 'plasmid_summary.txt.0' or 'all_assemblies_0.fna') in \
 		targetdir_files:
 			print('\nFiles from previous genview run detected in target directory!\nIf you want to update an existing database, use --update.\nIf you want to start a new run on a previously used target directory, use --clean!\n')
 			sys.exit()
