@@ -3027,8 +3027,8 @@ def remove_tmps():
 			os.remove(element)
 	
 	#Also remove downloaded genomes
-	if os.path.exists(f'{os.path.basename(args.target_directory)}/genomes'):
-		shutil.rmtree('{os.path.basename(args.target_directory)}/genomes')
+	if os.path.exists(f'{os.path.abspath(args.target_directory)}/genomes'):
+		shutil.rmtree('{os.path.abspath(args.target_directory)}/genomes')
 
 	print('temporary files removed!')
 
