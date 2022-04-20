@@ -80,7 +80,7 @@ def extract():
 		
 	if args.log==True:
 		if len([line for line in open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis/'+args.gene+'_contexts.fna', 'w') if line.startswith('>')])>=2:
-			log_lines.append('Target sequences extracted...\n'):
+			log_lines.append('Target sequences extracted...\n')
 		else:
 			log_lines.append('No/too few target sequences extracted...FAILED\n')
 		write_log()
