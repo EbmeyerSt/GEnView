@@ -34,7 +34,7 @@ The following softwares should be located in your $PATH:
 
 # Usage
 
-`genview-makedb` (python /path/to/genview/genview_scripts/genview_create_db.py if downloaded manually) automatically downloads genomes (and if specied, plasmids) of the specified species from the NCBI Assembly/NR database and search them for the provided reference protein(s). Up to 20kb are extracted upstream and downstream, annotated and aligned.
+`genview-makedb` (python /path/to/genview/genview_scripts/genview_create_db.py if downloaded manually) automatically downloads genomes (and if specied, plasmids) of the specified species from the NCBI Assembly/NR database and search them for the provided reference protein(s). Up to 20kb are extracted upstream and downstream, annotated and aligned. Detailed parameter explanations can be found below.
 
 An example walk-through can be found in the wiki: https://github.com/EbmeyerSt/GEnView/wiki
 
@@ -81,6 +81,13 @@ optional arguments:
   ```
 
 **WARNING**: if you specify --taxa 'all', genview-makedb will attempt to download all available genomes and plasmids - > 4TB of data! Processing of all data at once will take several **days** on a large server. Consider downloading smaller subsets instead. If you do not know in which taxa your gene is present, we recommend doing a manual blast at https://blast.ncbi.nlm.nih.gov/Blast.cgi first - This will show you in which taxa your reference sequence is found!
+
+
+**genview-makedb parameter details**
+
+--update | Update a previously created database. When using --update, specify the path to a directory containing the genview database you want to update as the target directory (-d) for this run
+
+--uniprot_db | Path to uniprotKB diamond database for annotation of the target genes flanking sequences. GenView will automatically attempt to download the database if --uniprot_db is not specified
 
 
 `genview-visualize` (python /path/to/genview/genview_scripts/genview_visualize.py if downloaded manually) takes the previously extracted sequences as input and creates an interactive visualization of the reference gene in its different genetic environments.
