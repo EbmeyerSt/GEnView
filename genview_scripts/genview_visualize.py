@@ -84,12 +84,12 @@ def extract():
 			+'\n'+flank_dict[str(result[1])]+'\n')
 		
 	if args.log==True:
-		if len([line for line in open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis/'+args.gene+'_contexts.fna', 'w') if line.startswith('>')])>=2:
+		if len([line for line in open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis/'+args.gene+'_contexts.fna', 'r') if line.startswith('>')])>=2:
 			log_lines.append('Target sequences extracted...\n')
 		else:
 			log_lines.append('No/too few target sequences extracted...FAILED\n')
 		write_log()
-
+		
 def read_db(context_file):
 
 	print('Reading db...')
@@ -1057,7 +1057,7 @@ def main():
 
 def write_log():
 	
-	with open(f'{os.path.abspath(args.target_directory)}/genview_viz.log', 'w') as outfile:
+	with open(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis/'+'genview_viz.log', 'w') as outfile:
 		for line in log_lines:
 			outfile.write(line)
 
