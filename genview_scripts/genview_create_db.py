@@ -1058,8 +1058,7 @@ def update():
 
 		if not args.accessions=='False':
 			accessions=[line.rstrip('\n') for line in open(args.accessions, 'r')]
-			asm_sum_lines=[line for line in open(args.target_directory.rstrip('/')\
-			+'/assembly_summary.txt', 'r') if any(acc in line for acc in accessions)]
+			asm_sum_lines=[line for line in open(newest, 'r') if any(acc in line for acc in accessions)]
 
 			with open(newest, 'w') as f:
 				for line in asm_sum_lines:
@@ -1087,7 +1086,7 @@ def update():
 			if len(summary_files)>1:
 
 				previous_asms=[line.split('\t')[0] for line in open(previous, 'r') if not line.startswith('#')]
-				new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.startswith('#') and line.split('\t')[0] in args.accessions and not line.split('\t')[0] in previous_asms]
+				new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.startswith('#') and line.split('\t')[0] in [line.rstrip('\n') for line in open(args.accessions, 'r')] and not line.split('\t')[0] in previous_asms]
 
 			else:
 
@@ -1200,7 +1199,7 @@ def update():
 				genome_urls.extend([line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0')])
 		else:
 			if args.taxa!='False':
-				genome_urls=[line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0') if any(taxa for taxa in args.taxa)]
+				genome_urls=[line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0') if any(taxon for taxon in args.taxa)]
 			else:
 				genome_urls=[line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0')]
 
@@ -2462,6 +2461,11 @@ def main():
 
 	global args
 	args=parse_arguments()
+
+	if not (args.database.endswith('.fna') or args.database.endswith('.fa') or args.database.endswith('.fasta') or args.\
+	database.endswith('.faa')):
+		print('\nIs your -db file in fasta format? Please provide a file ending with .fna, .fa, .faa or .fasta.\n')
+		sys.exit()
 
 	if not os.path.exists(args.target_directory):
 		print('Target directory does not exist, creating...')
