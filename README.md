@@ -39,14 +39,11 @@ The following softwares should be located in your $PATH:
 An example walk-through can be found in the wiki: https://github.com/EbmeyerSt/GEnView/wiki
 
 ```
-usage: genview-makedb [-h] -d TARGET_DIRECTORY -db DATABASE
-                            [-p PROCESSES] [-id IDENTITY]
-                            [-scov SUBJECT_COVERAGE] [--is_db] [--uniprot_db]
-                            [--uniprot_cutoff UNIPROT_CUTOFF]
-                            [--taxa TAXA [TAXA ...]] [--assemblies]
-                            [--plasmids] [--custom] [--save_tmps]
-                            [--acc_list ACC_LIST]
-                            [--flanking_length FLANKING_LENGTH]
+usage: genview_create_db.py [-h] -d TARGET_DIRECTORY -db DATABASE [-p PROCESSES] [-id IDENTITY]
+                            [-scov SUBJECT_COVERAGE] [--update] [--uniprot_db UNIPROT_DB]
+                            [--uniprot_cutoff UNIPROT_CUTOFF] [--taxa TAXA [TAXA ...]] [--assemblies] [--plasmids]
+                            [--local LOCAL] [--save_tmps] [--accessions ACCESSIONS] [--flanking_length FLANKING_LENGTH]
+                            [--kraken2 KRAKEN2] [--log] [--clean]
 
 Creates sqlite3 database with genetic environment from genomes containing the provided reference gene(s).
 
@@ -62,30 +59,35 @@ optional arguments:
                         identity cutoff for hits to be saved to the database (e.g 80 for 80% cutoff)
   -scov SUBJECT_COVERAGE, --subject_coverage SUBJECT_COVERAGE
                         minimum coverage for a hit to be saved to db (e.g 80 for 80% cutoff)
-  --is_db               database containing IS, integrons, ISCR sequences
-  --uniprot_db          path to database for annotation of surrounding sequences. If unspecified default uniprotKB database will be downloaded to target directory
+  --update              update an existing genview database with new genomes
+  --uniprot_db UNIPROT_DB
+                        Path to uniprotKB database
   --uniprot_cutoff UNIPROT_CUTOFF
                         % identity threshold for annotating orfs aurrounding the target sequence, default 60
   --taxa TAXA [TAXA ...]
-                        taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list
+                        taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --accessions
   --assemblies          Search NCBI Assembly database
   --plasmids            Search NCBI Refseq plasmid database
-  --custom              Search custom genomes
+  --local LOCAL         path to local genomes
   --save_tmps           keep temporary files
-  --acc_list ACC_LIST   csv file containing one genome accession number per row, cannot be specied at the same time as --taxa
+  --accessions ACCESSIONS
+                        csv file containing one genome accession number per row, cannot be specied at the same time as --taxa
   --flanking_length FLANKING_LENGTH
                         Max length of flanking regions to annotate
+  --kraken2 KRAKEN2     Path to kraken2 database. Uses kraken2 to classify metagenomic long-reads.
+  --log                 Write log file for debugging
+  --clean               Erase files from previous genview runs from target directory
 
   ```
 
-**WARNING**: if you specify --taxa 'all', enview_db.py will attempt to download all available genomes and plasmids - > 4TB of data! Processing of all data at once will take several **days**. Consider downloading smaller subsets instead. If you do not know in which taxa your gene is present, we recommend doing a manual blast at https://blast.ncbi.nlm.nih.gov/Blast.cgi first - This will show you in which taxa your protein is found!
+**WARNING**: if you specify --taxa 'all', genview-makedb will attempt to download all available genomes and plasmids - > 4TB of data! Processing of all data at once will take several **days** on a large server. Consider downloading smaller subsets instead. If you do not know in which taxa your gene is present, we recommend doing a manual blast at https://blast.ncbi.nlm.nih.gov/Blast.cgi first - This will show you in which taxa your reference sequence is found!
 
 
 `genview-visualize` (python /path/to/genview/genview_scripts/genview_visualize.py if downloaded manually) takes the previously extracted sequences as input and creates an interactive visualization of the reference gene in its different genetic environments.
 
 ```
-usage: genview-visualize [-h] -gene GENE -db DB -id ID
-                            [-taxa TAXA [TAXA ...]] [--force] [--compressed]
+usage: genview_visualize.py [-h] -gene GENE -db DB -id ID [-nodes NODES] [-taxa TAXA [TAXA ...]] [--force]
+                            [--compressed] [--custom_colors CUSTOM_COLORS] [--log]
 
 Extract, visualize and annotate genes and genetic environments from genview database
 
@@ -94,11 +96,15 @@ optional arguments:
   -gene GENE            name of gene/orf to extract and visualize
   -db DB                genview database created by genview-create-db
   -id ID                percent identity threshold for genes to extract
+  -nodes NODES          should nodes be connected to genome with solid line (solid), connected by dashed line (dash) or no connection (none)
   -taxa TAXA [TAXA ...]
                         list of genera and/or species to extract
                         By default all taxa are extracted
   --force               Force new alignment and phylogeny
   --compressed          Compress number of displayed sequences, helpful with large number of identical sequences
+  --custom_colors CUSTOM_COLORS
+                        path to file containing RGB color codes for gene color customization
+  --log                 Write log file
 
 ```
  specifying `--compressed` will cluster all sequences based on their annotaton profile and remove duplicates. Only the centroids of the resulting clusters will be visualized in that case. Helpful for large numbers of genomes. 
