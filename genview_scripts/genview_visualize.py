@@ -65,9 +65,9 @@ def extract():
 	if not os.path.exists(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'):
 		os.makedirs(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis')
 
-	else:
-		print(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'+'exists already!\n\
-				Use --force to overwrite previous results.\n')
+	elif os.path.exists(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis') and not \
+	args.force==True:
+		print(os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'+'exists already!\nUse --force to overwrite previous results.\n')
 		sys.exit()
 	
 	#Using the id, go back to the file containing the flanking regions and extract the ones matching the ids 
