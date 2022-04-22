@@ -85,9 +85,15 @@ optional arguments:
 
 **genview-makedb parameter details**
 
---update | Update a previously created database. When using --update, specify the path to a directory containing the genview database you want to update as the target directory (-d) for this run
+```--update``` | Update a previously created database. When using ```--update```, specify the path to a directory containing the genview database you want to update as the target directory (-d) for this run
 
---uniprot_db | Path to uniprotKB diamond database for annotation of the target genes flanking sequences. GenView will automatically attempt to download the database if --uniprot_db is not specified
+```--uniprot_db``` | Path to uniprotKB diamond database for annotation of the target genes flanking sequences. GenView will automatically attempt to download the database if ```--uniprot_db``` is not specified. If the download fails, instructions to manually download the database are provided and GEnView will exit.
+
+```--taxa``` | taxon names to download and search genomes for, e.g ```--taxa 'Aeromonas'``` to download all genomes and/or plasmids of the genus Aeromonas, e.g ```--taxa 'Aeromonas caviae' 'Escherichia coli' 'Leclercia adecarboxylata'``` to download all genomes for A. caviae, E. coli, and L. adecarboxylata.
+
+```--accessions``` | csv file containing one genome accession number per row, not to be specified at the same time as ```--taxa```. Accessions should either be in Assembly database format, e.g 'GCA_006364295.1' or nucleotide database format for plasmids, e.g 'NZ_01234.1'. If the providing Assembly accessions/plasmid accessions, specify ```--assemblies``` and/or ```--plasmids``` along with ```--accessions```.
+
+
 
 
 `genview-visualize` (python /path/to/genview/genview_scripts/genview_visualize.py if downloaded manually) takes the previously extracted sequences as input and creates an interactive visualization of the reference gene in its different genetic environments.
