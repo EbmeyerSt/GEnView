@@ -34,6 +34,8 @@ The following softwares should be located in your $PATH:
 
 # Usage
 
+**genview-makedb**
+
 `genview-makedb` (python /path/to/genview/genview_scripts/genview_create_db.py if downloaded manually) automatically downloads genomes (and if specied, plasmids) of the specified species from the NCBI Assembly/NR database and search them for the provided reference protein(s). Up to 20kb are extracted upstream and downstream, annotated and aligned. Detailed parameter explanations can be found below.
 
 An example walk-through can be found in the wiki: https://github.com/EbmeyerSt/GEnView/wiki
@@ -89,12 +91,14 @@ optional arguments:
 
 ```--uniprot_db``` | Path to uniprotKB diamond database for annotation of the target genes flanking sequences. GenView will automatically attempt to download the database if ```--uniprot_db``` is not specified. If the download fails, instructions to manually download the database are provided and GEnView will exit.
 
-```--taxa``` | taxon names to download and search genomes for, e.g ```--taxa 'Aeromonas'``` to download all genomes and/or plasmids of the genus Aeromonas, e.g ```--taxa 'Aeromonas caviae' 'Escherichia coli' 'Leclercia adecarboxylata'``` to download all genomes for A. caviae, E. coli, and L. adecarboxylata.
+```--taxa``` | taxon names to download and search genomes for, e.g ```--taxa 'Aeromonas'``` to download all genomes and/or plasmids of the genus *Aeromonas*, e.g ```--taxa 'Aeromonas caviae' 'Escherichia coli' 'Leclercia adecarboxylata'``` to download all genomes for *A. caviae, E. coli*, and *L. adecarboxylata*.
 
 ```--accessions``` | csv file containing one genome accession number per row, not to be specified at the same time as ```--taxa```. Accessions should either be in Assembly database format, e.g 'GCA_006364295.1' or nucleotide database format for plasmids, e.g 'NZ_01234.1'. If the providing Assembly accessions/plasmid accessions, specify ```--assemblies``` and/or ```--plasmids``` along with ```--accessions```.
 
+```--local``` | Path to local genome files in fasta format. Headers should be as simple as possible, with or without species classification, e.g: '>contig1 Escherichia coli'
 
 
+**genview-visualize**
 
 `genview-visualize` (python /path/to/genview/genview_scripts/genview_visualize.py if downloaded manually) takes the previously extracted sequences as input and creates an interactive visualization of the reference gene in its different genetic environments.
 
