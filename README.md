@@ -54,7 +54,7 @@ optional arguments:
   -d TARGET_DIRECTORY, --target_directory TARGET_DIRECTORY
                         path to output directory
   -db DATABASE, --database DATABASE
-                        fasta/multifasta file containing amino acid sequences of translated genes to be annotated
+                        fasta/multifasta file containing amino acid sequences of translated target genes to be annotated
   -p PROCESSES, --processes PROCESSES
                         number of cores to run the script on
   -id IDENTITY, --identity IDENTITY
@@ -76,7 +76,7 @@ optional arguments:
                         csv file containing one genome accession number per row, cannot be specied at the same time as --taxa
   --flanking_length FLANKING_LENGTH
                         Max length of flanking regions to annotate
-  --kraken2 KRAKEN2     Path to kraken2 database. Uses kraken2 to classify metagenomic long-reads.
+  --kraken2 KRAKEN2     Path to kraken2 database. Uses kraken2 to classify unclassified sequences.
   --log                 Write log file for debugging
   --clean               Erase files from previous genview runs from target directory
 
@@ -93,10 +93,13 @@ optional arguments:
 
 ```--taxa``` | taxon names to download and search genomes for, e.g ```--taxa 'Aeromonas'``` to download all genomes and/or plasmids of the genus *Aeromonas*, e.g ```--taxa 'Aeromonas caviae' 'Escherichia coli' 'Leclercia adecarboxylata'``` to download all genomes for *A. caviae, E. coli*, and *L. adecarboxylata*.
 
-```--accessions``` | csv file containing one genome accession number per row, not to be specified at the same time as ```--taxa```. Accessions should either be in Assembly database format, e.g 'GCA_006364295.1' or nucleotide database format for plasmids, e.g 'NZ_01234.1'. If the providing Assembly accessions/plasmid accessions, specify ```--assemblies``` and/or ```--plasmids``` along with ```--accessions```.
+```--accessions```/ ```--plasmids``` | csv file containing one genome accession number per row, not to be specified at the same time as ```--taxa```. Accessions should either be in Assembly database format, e.g 'GCA_006364295.1' or nucleotide database format for plasmids, e.g 'NZ_01234.1'. If the providing Assembly accessions/plasmid accessions, specify ```--assemblies``` and/or ```--plasmids``` along with ```--accessions```.
 
 ```--local``` | Path to local genome files in fasta format. Headers should be as simple as possible, with or without species classification, e.g: '>contig1 Escherichia coli'
 
+```--kraken2``` | Path to kraken2 database, can be used to classify unclassified local sequences. Requires prebuilt kraken2 database at specified path.
+
+```--clean``` | Removes files from previous genview run from target directory.
 
 ## genview-visualize
 
