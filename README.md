@@ -34,7 +34,7 @@ The following softwares should be located in your $PATH:
 
 # Usage
 
-**genview-makedb**
+## genview-makedb
 
 `genview-makedb` (python /path/to/genview/genview_scripts/genview_create_db.py if downloaded manually) automatically downloads genomes (and if specied, plasmids) of the specified species from the NCBI Assembly/NR database and search them for the provided reference protein(s). Up to 20kb are extracted upstream and downstream, annotated and aligned. Detailed parameter explanations can be found below.
 
@@ -98,7 +98,7 @@ optional arguments:
 ```--local``` | Path to local genome files in fasta format. Headers should be as simple as possible, with or without species classification, e.g: '>contig1 Escherichia coli'
 
 
-**genview-visualize**
+## genview-visualize
 
 `genview-visualize` (python /path/to/genview/genview_scripts/genview_visualize.py if downloaded manually) takes the previously extracted sequences as input and creates an interactive visualization of the reference gene in its different genetic environments.
 
@@ -129,10 +129,6 @@ optional arguments:
  Note that the output file was tested on Google Chrome (Version 91.0.4472.164) and Firefox (Version 90.0) and may not function properly when opened in older versions other web browsers.
 
 
-## Custom genomes or contigs
-
-It is possible to use GEnView with custom genomes and/or contigs. To do so, the parameter `--custom` must be specified and the genomes/contigs to be used must be placed in the target directory in a file named **all_assemblies.fna**.
-If you have taxonomical information of your sequences this can be provided in a file named **custom_summary.txt** which then also must be placed in the target directory. The format of the file should be tab separated with the columns: contigID, taxonomical ID, taxonomical name, custom information (e.g. country, site, time...).
 
 
 # Output files
