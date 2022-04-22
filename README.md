@@ -31,7 +31,6 @@ The following softwares should be located in your $PATH:
 * FastTree >=2.1.9
 
 
-
 # Usage
 
 ## genview-makedb
@@ -143,11 +142,16 @@ optional arguments:
  
  ```--compressed``` | Cluster all sequences containing the target gene based on their annotation profile and remove dupliocates. Only the centroids of the resulting clusters will be visualized. helpful for large numbers of genomes.
  
- ```--custom_colors``` | 
+ ```--custom_colors``` | Path to file specifying RGB color codes for user selected classes of genes. File should be text file in format:
  
+ gene_class1\tkeyword1,keyword2\trgbcolorcode
+ gene_class2\tkeyword3, keyword4, keyword3\trgbcolorcode
+ gene_class3\tkeyword5\trgbcolorcode
  
-
-
+ The 'keywords' are words found in the name of the respective genes. E.g if you want to display all efflux pumps in your visualization in blue, the corresponding row in the file specified under ```--custom_colors``` would look like this:
+ 
+ pumps\tefflux, pump\trgb(70,130,180)
+ 
 
 # Output files
 
