@@ -1052,7 +1052,7 @@ def main():
 	output = create_html(final_tree, os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'.rstrip('/')+'/'+'visualization_meta.csv')
 	#Write HTML output file
 	write_output(output, os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis')
-	print('Visualization ready!')
+	print(f"Visualization ready for viewing in web browser, saved in {os.path.dirname(args.db).rstrip('/')+'/'+args.gene.lower()+'_'+str(args.id)+'_analysis'}/interactive_visualisation.html")
 	exit()
 
 def write_log():
