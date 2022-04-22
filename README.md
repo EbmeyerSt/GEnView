@@ -171,4 +171,4 @@ The following output files will be produced in the specified output directory wh
 
 **yourgenename_contexts.unique.tree** Tree file created by FastTree2
 
-**interactive_output.html** Interactive visualization of tree and extracted sequence (target gene+genetic environment). Viewed in web browser (Google Chrome 91.0.4472.164 and Firefox 90.0).
+**interactive_visualization.html** Interactive visualization of tree and extracted sequence (target gene+genetic environment). Viewed in web browser (Google Chrome 91.0.4472.164 and Firefox 90.0).
