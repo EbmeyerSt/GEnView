@@ -130,7 +130,22 @@ optional arguments:
  specifying `--compressed` will cluster all sequences based on their annotaton profile and remove duplicates. Only the centroids of the resulting clusters will be visualized in that case. Helpful for large numbers of genomes. 
 
  Note that the output file was tested on Google Chrome (Version 91.0.4472.164) and Firefox (Version 90.0) and may not function properly when opened in older versions other web browsers.
-
+ 
+ **genview-visualize parameter details**
+ 
+ ```-gene``` | gene names to extract and visualize from previously created database. E.g ```-gene 'PER-1'``` will extract and visualize all found PER-1 genes. ```-gene 'PER-'``` will extract and visualize all target genes containing 'PER-' from the database. ```-gene 'PER-1' 'PER-2'``` will extract and visualize all instances of 'PER-1' and 'PER-2' genes.
+ 
+ ```-taxa``` | taxon names to extract and visualize from previously created database. E.g ```-taxa 'Aeromonas'``` to visualize th eidentified target gene in all sequences of the genus *Aeromonas*, e.g ```-taxa 'Aeromonas caviae' 'Escherichia coli' 'Leclercia adecarboxylata'``` to visualize the target gene for *A. caviae, E. coli*, and *L. adecarboxylata*.
+ 
+ ```-db``` | path to genview database 'genview_database.db', created in the target directory for ```genview-makedb```
+ 
+ ```--force``` | Force new alignment and phylogeny for a previously extracted gene
+ 
+ ```--compressed``` | Cluster all sequences containing the target gene based on their annotation profile and remove dupliocates. Only the centroids of the resulting clusters will be visualized. helpful for large numbers of genomes.
+ 
+ ```--custom_colors``` | 
+ 
+ 
 
 
 
