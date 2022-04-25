@@ -96,14 +96,19 @@ def read_db(context_file):
 	#Todo: Add cluster size to tree 
 	#Create list of gene ids from the flanking region file
 	if args.compressed==True:
+
+		#Cluster sequences with CD-HIT
+		clustercommand=f'cd-hit-est -i {context_file[0]} -o {context_file[0]}.centroids -c 0.95 -M 0 -T 0 -aS 0.9'
+		subprocess.call(clustercommand, shell=True)
+
 		arg_ids=[line.split('__')[1] for line in open(context_file[0]+'.centroids', 'r') \
 			if line.startswith('>')]
 
-		clust_sizes={}
-		for line in open(context_file[0]+'.clusters', 'r'):
-			if line.startswith('C'):
-				clust_sizes[line.split('\t')[8].split('__')[1]]={}
-				clust_sizes[line.split('\t')[8].split('__')[1]]=line.split('\t')[2]
+		#clust_sizes={}
+		#for line in open(context_file[0]+'.clusters', 'r'):
+		#	if line.startswith('C'):
+		#		clust_sizes[line.split('\t')[8].split('__')[1]]={}
+		#		clust_sizes[line.split('\t')[8].split('__')[1]]=line.split('\t')[2]
 	else:
 		arg_ids=[line.split('__')[1] for line in open(context_file[0], 'r') \
 			if line.startswith('>')]
@@ -170,8 +175,8 @@ def read_db(context_file):
 				gene_dict[id]['organism']=result[8]
 				gene_dict[id]['assembly']=result[9]
 
-				if args.compressed==True:
-					gene_dict[id]['cluster_size']=clust_sizes[id]
+				#if args.compressed==True:
+				#	gene_dict[id]['cluster_size']=clust_sizes[id]
 				gene_dict[id]['env_genes']={}
 
 			gene_dict[id]['env_genes'][result[11]]={}
@@ -355,6 +360,7 @@ def align(context_file, unique_profiles):
 
 	#If compressed==True, use centroid file for this
 	if args.compressed==True:
+
 		context_file[0]=context_file[0]+'.centroids'
 
 	#Read in gene contexts
