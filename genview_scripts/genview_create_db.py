@@ -24,7 +24,7 @@ def parse_arguments():
 	parser=argparse.ArgumentParser(description=man_description.replace("'", ""), formatter_class=RawTextHelpFormatter)
 	parser.add_argument('-d', '--target_directory', help='path to output directory', required=True)
 	parser.add_argument('-db', '--database', help='fasta/multifasta file containing amino acid sequences of translated genes to be annotated', required=True)
-	parser.add_argument('-p', '--processes', help='number of cores to run the script on', type=int, default=multiprocessing.cpu_count())
+	parser.add_argument('-p', '--processes', help='number of cores to run the script on', type=int, default=int(multiprocessing.cpu_count()/2))
 	parser.add_argument('-id', '--identity', help='identity cutoff for hits to be saved to the database (e.g 80 for 80%% cutoff)', type=float, default=90)
 	parser.add_argument('-scov', '--subject_coverage', help='minimum coverage for a hit to be saved to db (e.g 80 for 80%% cutoff)', type=float, default=90)
 	parser.add_argument('--update', help='update an existing genview database with new genomes', action='store_true', default='False')
@@ -2462,6 +2462,10 @@ def main():
 	global args
 	args=parse_arguments()
 
+	if not os.path.exists(os.path.abspath(args.database)):
+		print('\nPath specified with -db does not exist, please provide a valid path!\n')
+		sys.exit()
+
 	if not (args.database.endswith('.fna') or args.database.endswith('.fa') or args.database.endswith('.fasta') or args.\
 	database.endswith('.faa')):
 		print('\nIs your -db file in fasta format? Please provide a file ending with .fna, .fa, .faa or .fasta.\n')
@@ -2503,6 +2507,10 @@ def main():
 		sys.exit()
 	
 	if args.local!='False':
+		if not os.path.isdir(args.local):
+			print('--local should provide the path to directory containing local genome files!')
+			sys.exit()
+
 		if os.path.abspath(args.local)==os.path.abspath(args.target_directory):
 			print('\nTarget directory and local genome directory are the same - Please create a separate directory for your local sequences and specify it using --local')
 			sys.exit()
@@ -2554,7 +2562,7 @@ def main():
 	if args.kraken2!='False':
 		db_files=[file for file in os.listdir(args.kraken2) if file.endswith('.k2d')]
 		if len(db_files)<1:
-			print('no kraken2 database files detected in specified path, if you want to use kraken2 you need to build a kraken2 database first!')
+			print('No kraken2 database files detected in specified path, if you want to use kraken2 you need to build a kraken2 database first!')
 			sys.exit()
 	
 	if args.long_reads==True and args.local=='False':
@@ -2565,7 +2573,7 @@ def main():
 		check_lr_headers()
 
 	if (args.assemblies==True or args.plasmids==True) and (args.long_reads==True or args.local!='False'):
-		print('--local/long-reads and --assemblies/plasmids cannot be specified at the same time!\n\
+		print('--local and --assemblies/plasmids cannot be specified at the same time!\n\
 		Create a database with either local data or assemblies/plasmids first and then update it.')
 		sys.exit()
 
