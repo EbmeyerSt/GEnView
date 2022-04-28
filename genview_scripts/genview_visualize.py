@@ -181,6 +181,9 @@ def read_db(context_file):
 
 			gene_dict[id]['env_genes'][result[11]]={}
 
+			if gene_dict[id]['organism']=='unknown':
+				gene_dict[id]['organism']=gene_dict[id]['assembly']
+
 			#Replace prodigal orf with target gene annotation
 			if result[4]-200<result[-3]<result[4]+200 and result[4]\
 			+result[3]-200<result[-2]<result[4]+result[3]+200:

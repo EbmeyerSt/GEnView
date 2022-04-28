@@ -825,17 +825,6 @@ def download_plasmids():
 			print('Could not connect to genview_database.db, exiting...\n')
 			sys.exit()
 		
-		cursor=connection.cursor()
-
-		query="""SELECT organism from genomes;"""
-		cursor.execute(query)
-		old_specs=cursor.fetchall()
-		old_spec_set={spec[0] for spec in old_specs}
-
-		if args.taxa!='False':
-			for spec in old_spec_set:
-				args.taxa.append(spec)
-
 		if args.accessions=='False':
 			print('comparing summary files...')
 			#compare old and new assembly_summary files, get list of genomes that are in new but not in old
@@ -1126,16 +1115,6 @@ def update():
 				print(f'lineages assigned, {excepts} of {len(asm_dict)} could not be assigned')
 
 				#Connect to database and fetch species present in previous database version
-				connection=sqlite3.connect(args.target_directory.rstrip('/')+'/genview_database.db')
-				cursor=connection.cursor()
-
-				query="""SELECT organism from genomes;"""
-				cursor.execute(query)
-				old_specs=cursor.fetchall()
-				old_spec_set={spec[0] for spec in old_specs}
-
-				for spec in old_spec_set:
-					args.taxa.append(spec)
 
 		#Now multiprocess the download of these new genomes into temporary folder
 		#disable for now to make sure not all genomes have to be downloaded again
@@ -1467,6 +1446,30 @@ def update():
 			i+=1
 			outfile.write(line.rstrip('\n')+'\t'+str(i)+'\n')
 	outfile.close()
+
+	if os.path.getsize(args.target_directory.rstrip('/')+'/update_tmp/all_annos.fna_tmp')==0:
+		print('No target gene was found in the specified sequences, removing intermediate directories and  exiting...\n')
+
+		if args.assemblies!='False':
+			for file in [file for file in os.listdir(args.target_directory) if file.startswith('assembly_summary')\
+				and len(file.split('.'))>2]:
+				os.remove(args.target_directory.rstrip('/')+'/'+file)
+
+		if args.plasmids!='False':
+
+			for file in [file for file in os.listdir(args.target_directory) if file.startswith('plasmid_summary')\
+				and str(file.split('.')[2])!=str(0)]:
+				os.remove(args.target_directory.rstrip('/')+'/'+file)
+
+		if args.local!='False':
+
+			for file in [file for file in os.listdir(args.target_directory) if file.startswith('local_summary')\
+				and str(file.split('.')[2])!=str(0)]:
+				os.remove(args.target_directory.rstrip('/')+'/'+file)
+
+		shutil.rmtree(args.target_directory.rstrip('/')+'/update_tmp')
+
+		sys.exit()
 
 	all_orfs_gff=[args.target_directory.rstrip('/')+'/update_tmp/'+file for file in os.listdir(args.target_directory\
 	.rstrip('/')+'/update_tmp') if file.endswith('_orfs.gff')]	
@@ -2368,7 +2371,6 @@ def to_sql_db(env_dict, all_anno, target_directory):
 			if args.kraken2!='False':
 				cursor.execute('INSERT INTO genomes(assembly, organism, taxon_id) VALUES(?,?,?);',\
 				 (key.split(' ')[0], sum_dict[key]['organism'], sum_dict[key]['taxon']))	
-				print(key, sum_dict[key]['organism'], sum_dict[key]['taxon'])
 			else:
 
 				cursor.execute('INSERT INTO genomes(assembly, organism, taxon_id) VALUES(?,?,?);',\
@@ -2837,6 +2839,7 @@ def main():
 	#If no flanking regions were found, exit
 	if len(lines)==0:
 		print('No database matches found, exiting...')
+		erase_previous()
 		sys.exit()
 
 	print('Writing temporary files...')
