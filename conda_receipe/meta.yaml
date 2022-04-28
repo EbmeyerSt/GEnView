@@ -17,21 +17,21 @@ build:
 requirements:
   host:
     - pip
-    - python=3.6
+    - python>=3.6
   run:
-    - python=3.6
+    - python>=3.6
     - pip
     - pandas
     - biopython >=1.68
     - numpy
     - time
     - sqlite
-    - argparse
     - prodigal
     - diamond
     - blast
     - cd-hit
     - fasttree
+    - mafft
 
 test:
   commands:
