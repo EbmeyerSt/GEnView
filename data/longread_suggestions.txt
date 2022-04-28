@@ -1,0 +1,17 @@
+You'll have to download some long read datasets to test this feature, here are some suggestions:
+
+River MGs:
+SRX14877874
+SRX14877873
+SRX14877872
+
+Soil MGs:
+SRX14879135
+SRX14879134
+SRX14879133
+
+Gut MGs:
+SRX14386759
+SRX14386758
+SRX14386757
+

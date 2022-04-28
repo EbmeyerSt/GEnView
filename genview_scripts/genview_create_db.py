@@ -8,13 +8,14 @@ from argparse import RawTextHelpFormatter
 from multiprocessing import Manager
 from collections import defaultdict
 from Bio.Seq import Seq
+from os.path import expanduser
 
 """Tutorial command:
 genview-makedb -d /path/to/output/directory -db /path/to/reference/PER.fna -p 10 -id 80 --taxa rheinheimera --assemblies
 
-Alternatively, if you already know which genomes you want to compare, you can specify their GenBank accessions via --acc_list, e.g:
+Alternatively, if you already know which genomes you want to compare, you can specify their GenBank accessions via --accessions, e.g:
 
-genview-makedb -d /path/to/output/directory -db /path/to/reference/PER.fna -p 10 -id 80 --acc_list /path/to/accessions.txt --assemblies
+genview-makedb -d /path/to/output/directory -db /path/to/reference/PER.fna -p 10 -id 80 --accessions /path/to/accessions.txt --assemblies
 """
 
 
@@ -23,21 +24,24 @@ def parse_arguments():
 	parser=argparse.ArgumentParser(description=man_description.replace("'", ""), formatter_class=RawTextHelpFormatter)
 	parser.add_argument('-d', '--target_directory', help='path to output directory', required=True)
 	parser.add_argument('-db', '--database', help='fasta/multifasta file containing amino acid sequences of translated genes to be annotated', required=True)
-	parser.add_argument('-p', '--processes', help='number of cores to run the script on', type=int, default=multiprocessing.cpu_count())
+	parser.add_argument('-p', '--processes', help='number of cores to run the script on', type=int, default=int(multiprocessing.cpu_count()/2))
 	parser.add_argument('-id', '--identity', help='identity cutoff for hits to be saved to the database (e.g 80 for 80%% cutoff)', type=float, default=90)
 	parser.add_argument('-scov', '--subject_coverage', help='minimum coverage for a hit to be saved to db (e.g 80 for 80%% cutoff)', type=float, default=90)
-	parser.add_argument('--update', help=argparse.SUPPRESS, action='store_true')
-	parser.add_argument('--is_db', help='database containing IS, integrons, ISCR sequences', required=False, action='store_true')
-	parser.add_argument('--uniprot_db', help='path to database for annotation of surrounding sequences in ".dmnd" format. If unspecified default uniprotKB database will be downloaded to target directory', required=False, default='False')
+	parser.add_argument('--update', help='update an existing genview database with new genomes', action='store_true', default='False')
+	parser.add_argument('--uniprot_db', help='Path to uniprotKB database', required=False, default='False')
 	parser.add_argument('--uniprot_cutoff', help='%% identity threshold for annotating orfs aurrounding the target sequence, default 60', default=60)
-	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --acc_list', nargs='+', default='False')
+	parser.add_argument('--taxa', help='taxon/taxa names to download genomes for - use "all" do download all available genomes, cannot be specified at the same time as --accessions', nargs='+', default='False')
 	parser.add_argument('--assemblies', help='Search NCBI Assembly database ', action='store_true', default='False')
 	parser.add_argument('--plasmids', help='Search NCBI Refseq plasmid database', action='store_true', default='False')
-	parser.add_argument('--custom', help='Search custom genomes', action='store_true', default='False')
+	parser.add_argument('--local', help='path to local genomes', default='False')
 	parser.add_argument('--save_tmps', help='keep temporary files', action='store_true', default='False')
-	parser.add_argument('--acc_list', help='csv file containing one genome accession number per row, cannot be specied at the same time as --taxa', default='False')
+	parser.add_argument('--accessions', help='csv file containing one genome accession number per row, cannot be specied at the same time as --taxa', default='False')
 	parser.add_argument('--integron_finder', help=argparse.SUPPRESS, default='False')
 	parser.add_argument('--flanking_length', help='Max length of flanking regions to annotate', type=int, default=10000)
+	parser.add_argument('--long-reads', help=argparse.SUPPRESS, action='store_true', default='False')
+	parser.add_argument('--kraken2', help='Path to kraken2 database. Uses kraken2 to classify metagenomic long-reads.', default='False')
+	parser.add_argument('--log', help='Write log file for debugging', action='store_true', default='False')
+	parser.add_argument('--clean', help='Erase files from previous genview runs from target directory', action='store_true', default='False')
 	args=parser.parse_args()
 
 	return args
@@ -46,6 +50,17 @@ def download_uniprot():
 
 	#Check if gdown is installed
 	if args.uniprot_db=='False':
+	
+		print('\nPath to uniprot database (to annotate the target genes genetic environment) "uniprotKB.dmnd" not specified.\nIf you have run GEnView previously, please specify the full file path using --uniprot_db.\nElse, the database will be downloaded now!\n')
+		down=input('Download uniprotKB database? (y/n) ')
+		if down=='y':
+			pass
+		elif down=='n':
+			sys.exit()
+		else:
+			print('Invalid input, please answer y or n')
+			sys.exit()
+
 		try:
 			import gdown
 
@@ -62,9 +77,15 @@ def download_uniprot():
 		download_uniprot='gdown https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc -O %s'\
 		% args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna.gz'
 		if not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna.gz') and not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna'):
+			print('Decompressing database file...\n')
 			subprocess.call(download_uniprot, shell=True)
 			unzip=f'gunzip {args.target_directory.rstrip("/")+"/uniprotKBjan2019.fna.gz"}'
 			subprocess.call(unzip, shell=True)
+
+		#Check if download was succesfull
+		if not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKBjan2019.fna'):
+			print('\nDownload of the uniprot database failed, possibly due to exceeded bandwith limit on storage.\nPlease try again in a few hours or download the database manually from "https://drive.google.com/uc?id=1VY70ab47Pu2fodYKKm1_fbJ83NGT1dNc".\nTo convert the file into a diamond database, unzip it using "gunzip filename.gz" and then run "diamond makedb --in databasefile.fa -d yourdbname.dmnd".\nSpecify the path to the so created database using --uniprot_db.\nIf possible, use a version of the database created by a previous run.\n')
+			sys.exit()
 
 		#Transform to diamond database
 		if not os.path.exists(args.target_directory.rstrip('/')+'/uniprotKB.dmnd'):
@@ -72,23 +93,12 @@ def download_uniprot():
 			dmnd=f'diamond makedb --in {args.target_directory.rstrip("/")+"/uniprotKBjan2019.fna"} -d {args.target_directory.rstrip("/")+"/uniprotKB.dmnd"}'
 			subprocess.call(dmnd, shell=True)
 
-	#also download is_db
-	if args.is_db and not os.path.exists(args.is_db):
-		download_isdb='gdown https://drive.google.com/uc?id=1otE-8q4xQUxlrV15cosn6GFR1dKlADte -O %s'\
-		% args.target_directory.rstrip('/')+'/is_db.dmnd.gz'
-		if not os.path.exists(args.target_directory.rstrip('/')+'/is_db.dmnd.gz') and not os.path.exists(args.target_directory.rstrip('/')+'/is_db.dmnd'):
-			subprocess.call(download_isdb, shell=True)
-			unzip=f'gunzip {args.target_directory.rstrip("/")+"/is_db.dmnd.gz"}'
-			subprocess.call(unzip, shell=True)
-
-	elif args.is_db and os.path.exists(args.is_db):
-		#Check that this is a diamond database
-		if args.is_db.endswith('.dmnd'):
-			pass
-		else:
-			print('is_db: expects diamond database ending with ".dmnd"\nPlease provide a diamond database')
-			sys.exit()
-
+		if args.log==True:
+			if os.path.exists(args.target_directory.rstrip("/")+"/uniprotKBjan2019.fna"):
+				log_lines.append('UniprotKB downloaded...\n')
+			else:
+				log_lines.append('UniprotKB not found...FAILED\n')
+			write_log()			
 
 def reformat():
 
@@ -121,6 +131,7 @@ def reformat():
 				i+=1
 				new_format=f'>gb|{key+str(i)}|NOARO{i}|{key} [unknown]\n{value}\n'
 				outfile.write(new_format)
+		outfile.close()
 
 		#Transform to diamond database
 		diamond=f'diamond makedb --in {args.database+"_reformatted.fna"} -d {args.database.replace(args.database.split(".")[-1], "dmnd")}'
@@ -133,13 +144,33 @@ def reformat():
 		args.db_new=args.database.replace(args.database.split(".")[-1], "dmnd")
 		args.database=args.db_new
 
+	if args.log==True:
+		if os.path.exists(args.database.replace(args.database.split(".")[-1], "dmnd")):
+			log_lines.append('diamond database found...\n')
+		else:
+			log_lines.append('diamond database not found...FAILED\n')
+
+		write_log()		
+
 	return args.database
 
 def reverse_complement(seq):
 
 	#Calculate reverse complement
-	sequence=Seq(seq)
-	rev_seq=sequence.reverse_complement()
+
+	try:
+		sequence=Seq(seq)
+		rev_seq=sequence.reverse_complement()
+		reversedseq=True
+	except:
+		reversedseq=False
+	
+	if args.log==True:
+		if reversedseq==True:
+			log_lines.append('Sequences reversed...\n')
+		else:
+			log_lines.append('Exception while reversing sequences...FAILED\n')
+		write_log()
 
 	return rev_seq
 
@@ -148,10 +179,10 @@ def reverse_complement(seq):
 def download_new(queue):
 
 	if args.update==True:
-		target_dir=args.target_directory.rstrip('/')+'/'+'update_tmp/genomes'
+		target_dir=f'{os.path.abspath(args.target_directory)}/update_tmp/genomes'
 	else:
 
-		target_dir=args.target_directory.rstrip('/')+'/genomes'
+		target_dir=f'{os.path.abspath(args.target_directory)}/genomes'
 
 	#download newly published genomes
 	url=queue.get()
@@ -224,9 +255,21 @@ def split_fasta():
 		elif iterated_lines>=(line_num/split_num)*multiplicator and previous_complete==False:
 			outfile.write(line)
 		else:
+			outfile.close()
 			multiplicator+=1
 			outfile=open(target_dir+'/all_assemblies_'+str(multiplicator)+'.fna', 'w')
 			outfile.write(line)
+	outfile.close()
+
+	if args.log==True:
+		asm_splits=[file for file in os.listdir(target_dir) if file.startswith('all_assemblies_')\
+			and file.endswith('.fna')]
+		
+		if len(asm_splits)==split_num:
+			log_lines.append('Files split...\n')
+		else:
+			log_lines.append('Files split incorrectly...FAILED(?)\n')
+		write_log()
 
 def concatenate_and_split():
 
@@ -238,22 +281,67 @@ def concatenate_and_split():
 	if not os.path.isfile(target_dict.rstrip('/')+'/all_assemblies.fna'):
 		print('Concatenating novel assemblies...')
 		#Collect new genome fasta files
-		new_genomes=[content[0].rstrip('/')+'/'+element for content \
-		in os.walk(target_dict.rstrip('/')+'/genomes') \
-		for element in content[2] if element.endswith('_genomic.fna')]
+		if args.local=='False':
+			new_genomes=[content[0].rstrip('/')+'/'+element for content \
+			in os.walk(target_dict.rstrip('/')+'/genomes') \
+			for element in content[2] if element.endswith('_genomic.fna')]
 
-		#Write content of all fasta files to one file, append assembly name to respective contig
-		with open(target_dict+'/all_assemblies.fna', 'w') as outfile:
-			for file in new_genomes:
-				for line in open(file, 'r'):
-					if line.startswith('>'):
-						outfile.write(line.rstrip('\n')+'__'+\
-						file.split('/')[-1].split('_')[0]+'_'+\
-						file.split('/')[-1].split('_')[1]+'\n')
-					else:
-						outfile.write(line)
-				outfile.write('\n')
-	
+			#Write content of all fasta files to one file, append assembly name to respective contig
+			with open(target_dict+'/all_assemblies.fna', 'w') as outfile:
+				for file in new_genomes:
+					for line in open(file, 'r'):
+						if line.startswith('>'):
+							outfile.write(line.rstrip('\n')+'__'+\
+							file.split('/')[-1].split('_')[0]+'_'+\
+							file.split('/')[-1].split('_')[1]+'\n')
+						else:
+							outfile.write(line)
+					outfile.write('\n')
+			outfile.close()
+		else:
+			new_genomes=[f'{os.path.abspath(args.local)}/{file}' for file in os.listdir(args.local)]
+
+			#Write content of all fasta files to one file, append assembly name to respective contig
+			with open(target_dict+'/all_assemblies.fna', 'w') as outfile:
+				gvread_id=0
+				for file in new_genomes:
+					for line in open(file, 'r'):
+						if line.startswith('>'):
+							gvread_id+=1
+							if ' ' in line:
+								split_line=line.split(' ')
+								split_line[0]=str(split_line[0])+f'.{gvread_id}'
+								new_line=' '.join(split_line)	
+							else:
+								new_line=line.replace('\n', f'.{gvread_id}'+'\n')
+							outfile.write(new_line)
+						else:
+							outfile.write(line)
+					outfile.write('\n')
+			outfile.close()
+
+	if args.log==True:
+		if os.path.exists(target_dict+'/all_assemblies.fna') and os.path.getsize\
+			(target_dict+'/all_assemblies.fna')>0:
+			log_lines.append('all_assemblies.fna created...\n')
+		else:
+			
+			log_lines.append('all_assemblies.fna does not exist or is empty...FAILED\n')
+		write_log()
+
+	#Use kraken2 to classify long reads
+	if args.local!='False':
+		if args.kraken2!='False':
+			kraken2_classify(target_dict+'/all_assemblies.fna')	
+
+			if args.log==True:
+				if os.path.exists(os.path.abspath(f'{args.target_directory}/kraken2/all_assemblies.kraken2.out'))\
+				and os.path.exists(os.path.abspath(f'{args.target_directory}/kraken2/all_assemblies.kraken2.out')):	
+					log_lines.append('Kraken2 run sucessfully...\n')
+				else:
+					log_lines.append('Kraken2 run unsuccessful...FAILED\n')
+				write_log()
+
 	#Split fasta file into smaller files
 	print('Splitting into %d files...' % split_num)
 	split_fasta()
@@ -267,14 +355,22 @@ def concatenate_and_split():
 	#Multiprocess
 	multiprocess(convert_fa_to_csv, args.processes, fna_files)
 	print('All files converted to .csv')
+
 	csv_files=[target_dict+'/'+file \
 	for file in os.listdir(target_dict)\
 	 if file.endswith('.csv') and file.startswith('all_assemblies_')]
 
+	if args.log==True:
+		if len(csv_files)>0:
+			log_lines.append('.fna files converted to .csv...\n')
+		else:
+			log_lines.append('.fna files not properly converted to .csv...FAILED\n')
+		write_log()
+
 	#concatenate files back into number of split files specified
-	#through number of genomes to download
-	reconcatenate(fna_files)
-	reconcatenate(csv_files)
+	#through number of genomes to download 01-04-2022, this seems redundant
+	#reconcatenate(fna_files)
+	#reconcatenate(csv_files)
 
 
 def reconcatenate(file_list):
@@ -311,14 +407,6 @@ def reconcatenate(file_list):
 	#Rename new files to match old names
 	for file in new_files:
 		os.rename(file, file.replace(list(file_ending)[0]+'.reconcat', list(file_ending)[0]))
-		
-
-		
-
-
-
-
-	
 
 def add_taxonomy_lineages(summary_files):
 
@@ -326,7 +414,7 @@ def add_taxonomy_lineages(summary_files):
 	#identify latest assembly/plasmid summary file
 	newest=sorted(summary_files)[-1]
 
-	if args.update==True:
+	if args.update==True and len(summary_files)>1:
 		previous=sorted(summary_files)[-2]
 
 	#Process assembly summary
@@ -334,25 +422,30 @@ def add_taxonomy_lineages(summary_files):
 		if not args.update==True:
 			tax_dict={line.split('\t')[0]:line.split('\t')[5] for line in open(newest, 'r') if not line.startswith('#')}
 		else:
-			old_lines=[line for line in open(previous, 'r')]
-			tax_dict={line.split('\t')[0]:line.split('\t')[5] for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
+			if len(summary_files)>1:
+				old_lines=[line for line in open(previous, 'r')]
+				tax_dict={line.split('\t')[0]:line.split('\t')[5] for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
+			else:
+				tax_dict={line.split('\t')[0]:line.split('\t')[5] for line in open(newest, 'r') if not line.startswith('#')}
 
 	#Process plasmid summary
 	elif 'plasmid' in newest:
 		if not args.update==True:
 			tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#')}
 		else:
+			if len(summary_files)>1:
+				old_lines=[line for line in open(previous, 'r')]
+				tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
+			else:
+				tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#')}
 
-			old_lines=[line for line in open(previous, 'r')]
-			tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
-
-	#Process custom summary
-	elif 'custom' in newest:
+	#Process local summary
+	elif 'local_summary' in newest:
 		# check if summary file contains any information
 		with open(newest) as f:
 			lines = f.readlines()
-			# Iw we don't have any information, assign to cellular organism
-			if len(lines[1].split('\t'))<2:
+			# If we don't have any information, assign to cellular organism
+			if lines[0].count('\t')<2:
 				taxid = 131567
 			else:
 				taxid = False
@@ -362,11 +455,14 @@ def add_taxonomy_lineages(summary_files):
 			else:
 				tax_dict={line.split('\t')[0]:taxid for line in open(newest, 'r') if not line.startswith('#')}
 		else:
-			old_lines=[line for line in open(previous, 'r')]
-			if not taxid:
-				tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
+			if len(summary_files)>1:
+				old_lines=[line for line in open(previous, 'r')]
+				if not taxid:
+					tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
+				else:
+					tax_dict={line.split('\t')[0]:taxid for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
 			else:
-				tax_dict={line.split('\t')[0]:taxid for line in open(newest, 'r') if not line.startswith('#') and not line in previous}
+				tax_dict={line.split('\t')[0]:line.split('\t')[1] for line in open(newest, 'r') if not line.startswith('#')}
 
 	#Create lineage dict
 	lin_dict={}
@@ -404,6 +500,13 @@ def add_taxonomy_lineages(summary_files):
 	lineage_list=[[key, value['lineage'], value['name']] for key, value in lineages.items()]
 
 	multiprocess(assign_lineage_names, args.processes, lineage_list, new_lineages)
+
+	if args.log==True:
+		if len(new_lineages)>0:
+			log_lines.append('Lineages assigned...\n')
+		else:
+			log_lines.append('Lineages could not be assigned...FAILED\n')
+		write_log()
 
 	return new_lineages
 
@@ -450,6 +553,7 @@ def assign_lineage_names(queue, new_lineages):
 
 def merge_files():
 
+	print('Start merging...')
 	#Create a dictionary of matching files, so that they can be merged
 	file_dict={}
 	for filename in os.listdir(args.target_directory.rstrip('/')+'/update_tmp'):
@@ -461,14 +565,66 @@ def merge_files():
 
 	#now merge files into database directory
 	for key, value in file_dict.items():
+		if args.log==True:
+			log_lines.append('Merging files post-update...\n')
+
 		if not value=='':
 			merge_command='cat %s >> %s' % (key, value)
 			subprocess.call(merge_command, shell=True)
 
+			if args.log==True:
+				log_lines.append(f'{merge_command}...\n')
+
+	#Merge assembly and plasmid summary files, then delete unmerged
+	#Assembly summary files:
+	if args.assemblies==True:
+		asm_files=[f'{os.path.abspath(args.target_directory)}/{file}' for file in os.listdir(args.target_directory)\
+			 if file.startswith('assembly_summary')]
+		asm_sums=[line for file in asm_files for line in open(file, 'r')]
+
+		with open(args.target_directory.rstrip('/')+'/assembly_summary.txt', 'w') as asm_file:
+			for line in asm_sums:
+				asm_file.write(line)
+
+		for file in [file for file in os.listdir(args.target_directory) if file.startswith('assembly_summary')\
+			and len(file.split('.'))>2]:
+			os.remove(args.target_directory.rstrip('/')+'/'+file)
+
+	#Plasmid summary files:
+	if args.plasmids==True:
+		plas_files=[f'{os.path.abspath(args.target_directory)}/{file}' for file in \
+		os.listdir(args.target_directory) if file.startswith('plasmid_summary')]
+		plas_sums=[line for file in plas_files for line in open(file, 'r')]
+
+		with open(args.target_directory.rstrip('/')+'/plasmid_summary.txt.0', 'w') as plas_file:
+			for line in plas_sums:
+				plas_file.write(line)
+
+		for file in [file for file in os.listdir(args.target_directory) if file.startswith('plasmid_summary')\
+			and str(file.split('.')[2])!=str(0)]:
+			os.remove(args.target_directory.rstrip('/')+'/'+file)
+
+	#local summary files:
+	if args.local!='False':
+		loc_files=[f'{os.path.abspath(args.target_directory)}/{file}' for file in os.listdir(args.target_directory)\
+			 if file.startswith('local_summary')]
+		loc_sums=[line for file in loc_files for line in open(file, 'r')]
+
+		with open(args.target_directory.rstrip('/')+'/local_summary.txt.0', 'w') as loc_file:
+			for line in loc_sums:
+				loc_file.write(line)
+
+		for file in [file for file in os.listdir(args.target_directory) if file.startswith('local_summary')\
+			and str(file.split('.')[2])!=str(0)]:
+			os.remove(args.target_directory.rstrip('/')+'/'+file)
+
+	if args.log==True:
+		log_lines.append('Summary files merged')
+		write_log()
+
 	#Delete temporary directory
-#	shutil.rmtree(args.target_directory.rstrip('/')+'/update_tmp')
-	print('''Old and new files merged, temporary update directory removed!\n
-	Database was updated!''')
+	shutil.rmtree(args.target_directory.rstrip('/')+'/update_tmp')
+	print('''Old and new files merged, temporary update directory removed!\nDatabase updated!''')
 
 def convert_fa_to_csv(queue):
 
@@ -495,6 +651,7 @@ def convert_fa_to_csv(queue):
 		with open(fa_file.replace('.fna', '.csv'), 'w') as outfile:
 			for key, value in seq_dict.items():
 				outfile.write(key+'\t'+value+'\n')
+		outfile.close()
 
 		seq_dict.clear()
 
@@ -548,6 +705,13 @@ def download_plasmids():
 		unzip='gunzip %s*' % (args.target_directory.rstrip('/')+'/plasmids_tmp/')
 		subprocess.call(unzip, shell=True)
 
+	if args.log==True:
+		if len(os.listdir(args.target_directory.rstrip('/')+'/plasmids_tmp'))>0:
+			log_lines.append('Plasmids downloaded...\n')
+		else:
+			log_lines.append('No plasmids downloaded...FAILED\n')
+		write_log()
+
 	print('Processing plasmids, this may take some time...')
 
 	#Multiprocess reading in of plasmids
@@ -557,10 +721,16 @@ def download_plasmids():
 
 	plas_procs=args.processes
 
-
 	plas_dict=Manager().dict()
 	multiprocess(process_plasmids, plas_procs, plasmid_files, plas_dict)
 	plasmid_dict=dict(plas_dict)
+
+	if args.log==True:
+		if len(plasmid_dict)>0:
+			log_lines.append('Plasmid sequences read into memory...\n')
+		else:
+			log_lines.append('Plasmid sequences could not be read into memory...FAILED\n')
+		write_log()
 
 	#Determine number of plasmid_summary files
 	sum_files=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
@@ -571,11 +741,32 @@ def download_plasmids():
 	else:
 		sum_num=len(sum_files)
 
-#	Disable for debugging
-	print('Writing plasmid summary file...')
-	with open(args.target_directory.rstrip('/')+'/plasmid_summary.txt'+'.'+str(sum_num), 'w') as outfile:
-		for key, value in plasmid_dict.items():
-			outfile.write(str(key.split(' ')[0].lstrip('>'))+'\t'+' '.join(key.split(' ')[1:3])+'\n')
+	if args.taxa!='False':
+		print('Writing plasmid summary file based on specified taxa...')
+		with open(args.target_directory.rstrip('/')+'/plasmid_summary.txt'+'.'+str(sum_num), 'w') as outfile:
+			try:
+				for key, value in plasmid_dict.items():
+					if any(taxon.lower() in key.lower() for taxon in args.taxa):
+						outfile.write(str(key.split(' ')[0].lstrip('>'))+'\t'+' '.join(key.split(' ')[1:3])+'\n')
+			except:
+				
+					outfile.write('')
+					print('Something went wrong when writing plasmid summary...')
+		outfile.close()
+
+	if args.accessions!='False':
+		
+		print('Writing plasmid summary file from accession list...')
+		with open(args.target_directory.rstrip('/')+'/plasmid_summary.txt'+'.'+str(sum_num), 'w') as outfile:
+			try:
+				for key, value in plasmid_dict.items():
+					accessions=[line.rstrip('\n') for line in open(args.accessions, 'r')]
+					if any(acc.lower() in key.lower() for acc in accessions):
+						outfile.write(str(key.split(' ')[0].lstrip('>'))+'\t'+' '.join(key.split(' ')[1:3])+'\n')
+			except:
+					outfile.write('')
+					print('Something went wrong when writing plasmid summary...')
+		outfile.close()
 	
 	#add lineage to plasmid entries
 	print('adding lineages to plasmids...')
@@ -613,42 +804,56 @@ def download_plasmids():
 
 			new_plasmid_dict[key2]['lineage']='unassigned'
 
+	if args.log==True:
+		if len(new_plasmid_dict)>0:
+			log_lines.append('Lineages assigned to plasmids...\n')
+		else:
+			log_lines.append('Lineages could not be assigned to plasmids...FAILED\n')
+		write_log()
+
 	if args.update==True:
 		
 		#Connect to database and fetch species present in previous database version
-		connection=sqlite3.connect(args.target_directory.rstrip('/')+'/genview_database.db')
-		cursor=connection.cursor()
+		try:
+			connection=sqlite3.connect(f'{os.path.abspath(args.target_directory)}/genview_database.db')
+			if args.log==True:
+				log_lines.append('Successfully connected to GEnView database...\n')
+				write_log()
 
-		query="""SELECT organism from genomes;"""
-		cursor.execute(query)
-		old_specs=cursor.fetchall()
-		old_spec_set={spec[0] for spec in old_specs}
-
-		for spec in old_spec_set:
-			args.taxa.append(spec)
-
-		if args.acc_list=='False':
+		except Exception as e:
+			print(e)
+			print('Could not connect to genview_database.db, exiting...\n')
+			sys.exit()
+		
+		if args.accessions=='False':
 			print('comparing summary files...')
 			#compare old and new assembly_summary files, get list of genomes that are in new but not in old
 			summary_files=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
 			if file.startswith('plasmid_summary')]
 
 			newest=sorted(summary_files)[-1]
-			previous=sorted(summary_files)[-2]
 
-			previous_plas_accs=[line.split('\t')[0] for line in open(previous, 'r')]
-			new_plas_accs=[line.split('\t')[0] for line in open(newest, 'r') if not line.split('\t')[0] \
-			in previous_plas_accs]
+			if len(summary_files)>1:
+				previous=sorted(summary_files)[-2]
+
+				previous_plas_accs=[line.split('\t')[0] for line in open(previous, 'r')]
+				new_plas_accs=[line.split('\t')[0] for line in open(newest, 'r') if not line.split('\t')[0] \
+				in previous_plas_accs]
+			else:
+				
+				new_plas_accs=[line.split('\t')[0] for line in open(newest, 'r')]
 
 			print('%d novel plasmids identified!' % len(new_plas_accs))
 
 		else:
 			
+			summary_files=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
+			if file.startswith('plasmid_summary')]
 			newest=sorted(summary_files)[-1]
-			new_plas_accs=[line.split('\t')[0] for line in open(newest, 'r') and not line.startswith('#')]
+			new_plas_accs=[line.split('\t')[0] for line in open(newest, 'r') if not line.startswith('#')]
 
-		if not args.acc_list=='False':
-			genome_accessions=[line.rstrip('\n') for line in open(args.acc_list)]
+		if not args.accessions=='False':
+			genome_accessions=[line.rstrip('\n') for line in open(args.accessions)]
 			hits=0
 			for key, value in new_plasmid_dict.items():
 				#Filter by taxonomy:
@@ -657,6 +862,14 @@ def download_plasmids():
 					with open(args.target_directory.rstrip('/')+'/update_tmp/genomes/'\
 					+key+'_genomic.fna', 'w') as outfile:
 						outfile.write('>'+key+' plasmid\n'+value['seq'])
+					outfile.close()
+
+			if args.log==True:
+				if hits>0:
+					log_lines.append('Plasmids written to file...\n')
+				else:
+					log_lines.append('No new plasmids within accession list...\n')
+				write_log()
 
 		else:
 
@@ -671,6 +884,14 @@ def download_plasmids():
 						with open(args.target_directory.rstrip('/')+'/update_tmp/genomes/'\
 						+key+'_genomic.fna', 'w') as outfile:
 							outfile.write('>'+key+' plasmid\n'+value['seq'])
+						outfile.close()
+
+				if args.log==True:
+					if hits>0:
+						log_lines.append('Plasmids written to file...\n')
+					else:
+						log_lines.append('No new plasmids found for specified taxa...\n')
+					write_log()
 				
 				if hits>=1:
 					print('Plasmids written to file!')
@@ -679,17 +900,27 @@ def download_plasmids():
 					if not args.assemblies==True:
 						sys.exit()
 			else:
+				hits=0
 				for key, value in new_plasmid_dict.items():
 					if key in new_plas_accs:
+						hits+=1
 						with open(args.target_directory.rstrip('/')+'/update_tmp/genomes/'\
 						+key+'_genomic.fna', 'w') as outfile:
 							outfile.write('>'+key+' plasmid\n'+value['seq'])
+						outfile.close()					
+
+				if args.log==True:
+					if hits>0:
+						log_lines.append('Plasmids written to file...\n')
+					else:
+						log_lines.append('No new plasmids for specified taxa...\n')
+					write_log()
 
 	else:
 
 		
-		if not args.acc_list=='False':
-			genome_accessions=[line.rstrip('\n') for line in open(args.acc_list)]
+		if not args.accessions=='False':
+			genome_accessions=[line.rstrip('\n') for line in open(args.accessions)]
 			hits=0
 			for key, value in new_plasmid_dict.items():
 				#Filter by taxonomy:
@@ -698,6 +929,15 @@ def download_plasmids():
 					with open(args.target_directory.rstrip('/')+'/update_tmp/genomes/'\
 					+key+'_genomic.fna', 'w') as outfile:
 						outfile.write('>'+key+' plasmid\n'+value['seq'])
+					outfile.close()
+				
+			if args.log==True:
+				if hits>0:
+					log_lines.append('Plasmids written to file...\n')
+				else:
+					log_lines.append('No new plasmids for specified taxa...\n')
+				write_log()
+
 		else:
 			if not args.taxa[0]=='all':
 				hits=0
@@ -710,6 +950,15 @@ def download_plasmids():
 						with open(args.target_directory.rstrip('/')+'/genomes/'\
 						+key+'_genomic.fna', 'w') as outfile:
 							outfile.write('>'+key+' plasmid\n'+value['seq'])
+						outfile.close()
+					
+				if args.log==True:
+					if hits>0:
+						log_lines.append('Plasmids written to file...\n')
+					else:
+						log_lines.append('No new plasmids for specified taxa...\n')
+					write_log()
+
 				
 				if hits>=1:
 					print('Plasmids written to file!')
@@ -722,13 +971,39 @@ def download_plasmids():
 					with open(args.target_directory.rstrip('/')+'/genomes/'\
 					+key+'_genomic.fna', 'w') as outfile:
 						outfile.write('>'+key+' plasmid\n'+value['seq'])
+					outfile.close()
 
+				if args.log==True:
+					if len(new_plasmid_dict)>0:
+						log_lines.append('Plasmids written to file...\n')
+					else:
+						log_lines.append('No new plasmids for specified taxa...\n')
+					write_log()
 	#Remove plasmids_tmp
-	#shutil.rmtree(args.target_directory.rstrip('/')+'/plasmids_tmp')
+	shutil.rmtree(args.target_directory.rstrip('/')+'/plasmids_tmp')
 
 def update():
 
-	#args.db=reformat()
+	#Check if genview database exists
+	if not os.path.exists(f'{os.path.abspath(args.target_directory)}/genview_database.db'):
+		print('No genview database found in the target directory, exiting...\n')
+		sys.exit()
+
+	download_uniprot()
+
+	print('Update: creating temporary download directory...')
+	#Create temporary directory for downloading novel assemblies
+	if not os.path.exists(args.target_directory.rstrip('/')+'/'+'update_tmp'):
+		os.mkdir(args.target_directory.rstrip('/')+'/'+'update_tmp')
+
+
+	if args.log==True:
+		if os.path.isdir(args.target_directory.rstrip('/')+'/'+'update_tmp'):
+			log_lines.append('Update directory created...\n')
+		else:
+			log_lines.append('Update directory not found...FAILED\n')
+		write_log()
+
 	#Download assembly summary files
 	if args.assemblies==True:
 
@@ -743,29 +1018,77 @@ def update():
 		if file.startswith('assembly_summary.')]
 
 		newest=sorted(summary_files)[-1]
-		previous=sorted(summary_files)[-2]
+		
+		if args.log==True:
+			if os.path.exists(os.path.abspath(args.target_directory)+'/assembly_summary.txt'):
+				log_lines.append('Assembly summary downloaded...\n')
+			else:
+				log_lines.append('Assembly summary not found...FAILED\n')
+			write_log()
+		
+		#In case a database is updated with assemblies for the first time:
+		if len(summary_files)>1:
+			previous=sorted(summary_files)[-2]
+		
+		#Rewrite new assembly summary file such that it only contains genome accessions from specified species
+		if not args.taxa=='False':
+			if not args.taxa[0]=='all':
+				tax_asms=[]
+				taxon_lines=[line for line in open(newest, 'r') if not line.startswith('#')]
 
-		if args.acc_list=='False':
-			print('comparing assembly summary files...')
-			previous_asms=[line.split('\t')[0] for line in open(previous, 'r') if not line.startswith('#')]
-			new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.split('\t')[0] \
-			in previous_asms and not line.startswith('#')]
-			
-			print('%d new assemblies found!' % len(new_genome_urls)) 
-			print(new_genome_urls)
+				for line in taxon_lines:
+					if any(taxon.lower() in line.lower() for taxon in args.taxa):
+						tax_asms.append(line)
 
+				with open(newest, 'w') as f:
+					for line in tax_asms:
+						f.write(line)
+				f.close()
+
+		if not args.accessions=='False':
+			accessions=[line.rstrip('\n') for line in open(args.accessions, 'r')]
+			asm_sum_lines=[line for line in open(newest, 'r') if any(acc in line for acc in accessions)]
+
+			with open(newest, 'w') as f:
+				for line in asm_sum_lines:
+					f.write(line)
+			f.close()
+
+		if args.log==True:
+			if os.path.exists(newest):
+				log_lines.append('New assembly summary rewritten...\n')
+			else:
+				log_lines.append('No new assembly summary file found...FAILED\n')
+			write_log()
+
+		if args.accessions=='False':
+			if len(summary_files)>1:
+				print('comparing assembly summary files...')
+				previous_asms=[line.split('\t')[0] for line in open(previous, 'r') if not line.startswith('#')]
+				new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.split('\t')[0] \
+				in previous_asms and not line.startswith('#')]
+				
+				print('%d new assemblies found!' % len(new_genome_urls)) 
+			else:
+				new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r')]
 		else:
+			if len(summary_files)>1:
 
-			new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.startswith('#')]
+				previous_asms=[line.split('\t')[0] for line in open(previous, 'r') if not line.startswith('#')]
+				new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.startswith('#') and line.split('\t')[0] in [line.rstrip('\n') for line in open(args.accessions, 'r')] and not line.split('\t')[0] in previous_asms]
+
+			else:
+
+				new_genome_urls=[line.split('\t')[19] for line in open(newest, 'r') if not line.startswith('#') and line.split('\t')[0] in args.accessions]
 	
-		print('Update: creating temporary download directory...')
-		#Create temporary directory for downloading novel assemblies
-		if not os.path.exists(args.target_directory.rstrip('/')+'/'+'update_tmp'):
-			os.mkdir(args.target_directory.rstrip('/')+'/'+'update_tmp')
-
+		if args.log==True:
+			if len(new_genome_urls)>=1:
+				log_lines.append('New genomes identified...\n')
+			else:
+				log_lines.append('No new genomes identified...FAILED(?)\n')
+			write_log()
 
 		#Create dictionary with assembly accession as key, lineages as value
-
 		new_lineages=add_taxonomy_lineages(summary_files)
 
 		asm_dict={}
@@ -778,7 +1101,7 @@ def update():
 			asm_dict[line.split('\t')[0]]['tax_id']=line.split('\t')[5]
 			asm_dict[line.split('\t')[0]]['url']=line.split('\t')[19]
 
-			if args.acc_list=='False':
+			if args.accessions=='False':
 				
 				print('Assigning lineages...')
 				try:
@@ -792,23 +1115,13 @@ def update():
 				print(f'lineages assigned, {excepts} of {len(asm_dict)} could not be assigned')
 
 				#Connect to database and fetch species present in previous database version
-				connection=sqlite3.connect(args.target_directory.rstrip('/')+'/genview_database.db')
-				cursor=connection.cursor()
-
-				query="""SELECT organism from genomes;"""
-				cursor.execute(query)
-				old_specs=cursor.fetchall()
-				old_spec_set={spec[0] for spec in old_specs}
-
-				for spec in old_spec_set:
-					args.taxa.append(spec)
 
 		#Now multiprocess the download of these new genomes into temporary folder
 		#disable for now to make sure not all genomes have to be downloaded again
 		#TODO add exact line lineage in summary file
 
-		if not args.acc_list=='False':
-			genome_accessions=[line.rstrip('\n').lower() for line in open(args.acc_list, 'r')]
+		if not args.accessions=='False':
+			genome_accessions=[line.rstrip('\n').lower() for line in open(args.accessions, 'r')]
 			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if key.lower() in genome_accessions]
 		
 		else:
@@ -819,13 +1132,90 @@ def update():
 			else:
 				
 				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
-		print(f'GENOME URLS:{genome_urls}')
+		
+		if args.log==True:
+			if len(new_genome_urls)>=1:
+				log_lines.append('New genomes identified...\n')
+			else:
+				log_lines.append('No new genomes identified...FAILED(?)\n')
+			write_log()
+		
+		if not os.path.exists(f'{os.path.abspath(args.target_directory)}/update_tmp/genomes'):
+			os.mkdir(f'{os.path.abspath(args.target_directory)}/update_tmp/genomes')
+	
 		multiprocess(download_new, args.processes, genome_urls)
 
+	elif args.local!='False':
 
-	if args.plasmids==True:
+		#Create local summary file
+		create_simple_summary_file()
+		
+		#find local assembly files
+		local_asms=[f'{os.path.abspath(args.target_directory)}/{file}' for file in \
+		os.listdir(args.target_directory) if file.startswith('local_summary')]
+		
+		if len(local_asms)>1:
+		
+			newest=sorted([line for line in open(local_asms[-1], 'r')])
+			previous=sorted([line for line in open(local_asms[-2], 'r')])
+
+			#Set 'genome_urls' to number of new genomes in specified local path
+			genome_urls=[line for line in newest if not line in previous]
+		else:
+			genome_urls=[line for line in open(local_asms[0], 'r')]
+
+	if args.plasmids==True:	
+
+		if not os.path.exists(f'{os.path.abspath(args.target_directory)}/update_tmp/genomes'):
+			os.mkdir(f'{os.path.abspath(args.target_directory)}/update_tmp/genomes')
+
 		#Download new plasmids
 		download_plasmids()
+		if 'genome_urls' in locals():
+			if args.taxa!='False':
+				genome_urls.extend([line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0') if any(taxon for taxon in args.taxa)])
+			else:
+				genome_urls.extend([line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0')])
+		else:
+			if args.taxa!='False':
+				genome_urls=[line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0') if any(taxon for taxon in args.taxa)]
+			else:
+				genome_urls=[line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0')]
+
+	if len(genome_urls)==0:
+		print('No new genomes identified, exiting...')
+		#Remove newest summary file(s) and in case of update, update directory
+		if args.update==True:
+			shutil.rmtree(f'{os.path.abspath(args.target_directory)}/update_tmp')
+		
+			if args.assemblies!='False':
+				del_asms=[f'{os.path.abspath(args.target_directory)}/{file}' for file in os.listdir\
+				(args.target_directory) if 'assembly_summary' in file]
+				os.remove(sorted(del_asms)[-1])	
+
+			if args.plasmids!='False':
+				del_plas=[f'{os.path.abspath(args.target_directory)}/{file}' for file in os.listdir\
+				(args.target_directory) if 'plasmid_summary' in file]
+				os.remove(sorted(del_plas)[-1])	
+
+			if args.local!='False':
+				del_loc=[f'{os.path.abspath(args.target_directory)}/{file}' for file in os.listdir\
+				(args.target_directory) if 'local_summary' in file]
+				os.remove(sorted(del_loc)[-1])	
+		sys.exit()
+		
+	#make split_num available in other functions	
+	global split_num
+
+	if 0<=len(genome_urls)<1000:	
+		split_num=2
+	elif 1000<len(genome_urls)<10000:	
+		split_num=5
+	elif 10000<len(genome_urls)<100000:	
+		split_num=20
+	else:
+		split_num=200
+
 	#concatenate new genomes to fasta and csv, then split into several files
 	#(corresponding to number of split files for creating the original db)
 	concatenate_and_split()
@@ -838,9 +1228,39 @@ def update():
 	and fa_file.endswith('.fna') and not fa_file.startswith('flanking') \
 	and not '_orfs' in fa_file]
 	
+	#make sure diamond database format is correct:
+	args.database=reformat()
+
 	#Define number of processes and empty list for processes
 	multiprocess(annotate, args.processes, fa_files)
 	#Do the same again for the 'create_database' function
+
+	if args.log==True:
+
+		#move diamond.log from current wd to target directory
+		if not os.path.exists(f'{args.target_directory}/update_tmp/diamond.log'):
+			mv_command=f'mv {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}/update_tmp'
+		if os.path.exists(f'{os.path.abspath(args.target_directory)}/diamond.log') and not f'{os.path.abspath(args.target_directory)}'==os.getcwd():
+			mv_command=f'cat {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}/update_tmp/diamond.log > {os.path.abspath(args.target_directory)}/update_tmp/diamond.log'
+		subprocess.call(mv_command, shell=True)
+
+		dmnd_log=[line for line in open(f'{os.path.abspath(args.target_directory)}/update_tmp/diamond.log', 'r') \
+		if 'queries aligned' in line]
+		if len(dmnd_log)==len(fa_files):
+			log_lines.append(f'diamond blastx run successfull...'+'\n')
+		else:
+			log_lines.append(f'diamond blastx run unsuccessfull...FAILED'+'\n')
+		write_log()
+
+	if args.log==True:
+		#Check presence and size of annotation files
+		anno_log=[file for file in os.listdir(args.target_directory.rstrip('/')+'/update_tmp')\
+			if file.endswith('_annotated.csv')]
+		if len(anno_log)>0:
+			log_lines.append('Annotation files generated...\n')
+		else:
+			log_lines.append('No annotation files could be found...FAILED\n')
+		write_log()
 
 	#Create list with files that have no corresponding flanking region file yet
 	no_flank_files=[element for element in fa_files if not os.path.exists(element+'_flanking_regions.csv')]
@@ -854,6 +1274,15 @@ def update():
 	os.listdir(args.target_directory.rstrip('/')+'/update_tmp')\
 	if fa_file.startswith('all_assemblies_')\
 	and fa_file.endswith('.fna_flanking_regions.csv')]
+
+
+	if args.log==True:
+		#Check presence and size of annotation files
+		if len(flank_files)>0:
+			log_lines.append('flanking region files generated...\n')
+		else:
+			log_lines.append('No flanking region files could be found...FAILED\n')
+		write_log()
 
 	#summarize all flanking regions into one temporary file
 	lines=[line for file in flank_files for line in open(file, 'r')]
@@ -877,6 +1306,7 @@ def update():
 
 			#Write in csv format to outfile
 			outfile.write(str(i)+'\t'+line.split('\t')[-6]+'\n')
+	outfile.close()
 
 	#after assigning id, split the file into specified number of smaller fasta files again
 	splitted_files=[file for file in os.listdir(args.target_directory.rstrip('/')+'/update_tmp/')\
@@ -895,9 +1325,11 @@ def update():
 		else:
 			file_count+=1
 			line_count=0
+			outfile.close()
 			outfile=open(args.target_directory.rstrip('/')+'/update_tmp/'+\
 			'flanking_regions_'+str(file_count)+'.fna', 'w')
 			outfile.write('>'+line.split('\t')[0]+'\n'+line.split('\t')[-1])
+	outfile.close()
 
 	#Create list with flanking regions file paths
 	flanking_fa=[args.target_directory.rstrip('/')+'/update_tmp/'+file for file in os.listdir(args.target_directory\
@@ -906,6 +1338,18 @@ def update():
 
 	#Create a multiprocessing queue from the flanking region files
 	multiprocess(run_prodigal, args.processes, flanking_fa)
+
+	if args.log==True:
+		orf_fna_log=[file for file in os.listdir(args.target_directory.rstrip('/')+'/update_tmp')\
+		if file.endswith('_orfs.fna')]
+		
+		orf_gff_log=[file for file in os.listdir(args.target_directory.rstrip('/')+'/update_tmp')\
+		if file.endswith('_orfs.gff')]
+		if len(orf_fna_log)>0 and len(orf_gff_log)>0:
+			log_lines.append('Orfs predicted...\n')
+		else:
+			log_lines.append('No orf files present, something might have gone wrong when running prodigal...FAILED\n')
+		write_log()	
 
 	#concatenate all orf files into one for clustering
 	concat_command='cat %s/flanking_regions_*_orfs.fna > %s/all_orfs.fna' % \
@@ -940,9 +1384,20 @@ def update():
 		else:
 			file_count+=1
 			key_count=0
+			outfile.close()
 			outfile=open(args.target_directory.rstrip('/')+'/update_tmp'+'/'+\
 			'split_'+str(file_count)+'_orfs.fna', 'w')
 			outfile.write(key+value)
+	outfile.close()
+	
+	if args.log==True:
+		orf_split_log=[file for file in os.listdir(args.target_directory.rstrip('/')+'/update_tmp')\
+		if 'split_' in file and file.endswith('_orfs.fna')]
+		if len(orf_split_log)>0:
+			log_lines.append('Orf files split for annotation...\n')
+		else:
+			log_lines.append('Orf files could not be split for annotation...FAILED\n')	
+		write_log()
 
 
 	#Now annotate orfs
@@ -952,12 +1407,69 @@ def update():
 
 	multiprocess(annotate_orfs, args.processes, orf_files)
 
+	if args.log==True:
+
+		#move diamond.log from current wd to target directory
+		if not os.path.exists(f'{args.target_directory}/update_tmp/diamond.log'):
+			mv_command=f'mv {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}/update_tmp'
+		if os.path.exists(f'{os.path.abspath(args.target_directory)}/diamond.log') and not f'{os.path.abspath(args.target_directory)}'==os.getcwd():
+			mv_command=f'cat {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}/update_tmp/diamond.log > {os.path.abspath(args.target_directory)}/update_tmp/diamond.log'
+		subprocess.call(mv_command, shell=True)
+
+		if os.path.exists(f'{os.getcwd()}/diamond.log'):
+			os.remove(f'{os.getcwd()}/diamond.log')
+
+		#now rename diamond log
+		if os.path.exists(f'{os.path.abspath(args.target_directory)}/dmnd.log'):
+			mv2=f'mv {os.path.abspath(args.target_directory)}/dmnd.log {os.path.abspath(args.target_directory)}/diamond.log'
+			subprocess.call(mv2, shell=True)
+
+		dmnd_log=[line for line in open(f'{os.path.abspath(args.target_directory)}/update_tmp/diamond.log', 'r') \
+		if 'queries aligned' in line]
+		if not args.update==True:
+			if len(dmnd_log)/2==len(fa_files):
+				log_lines.append(f'diamond blastp run successfull...'+'\n')
+			else:
+				log_lines.append(f'diamond blastp run unsuccessfull...FAILED'+'\n')
+		else:
+			
+			if len(dmnd_log)>1:
+				log_lines.append(f'diamond blastp run successfull...'+'\n')
+			else:
+				log_lines.append(f'diamond blastp run unsuccessfull...FAILED'+'\n')
+		write_log()
+
 	#Create a temporary summary file containing the line id
 	with open(args.target_directory.rstrip('/')+'/update_tmp/all_annos.fna_tmp', 'w') as outfile:
 		i=int(sorted(previous_ids)[-1])
 		for line in sorted(lines):
 			i+=1
 			outfile.write(line.rstrip('\n')+'\t'+str(i)+'\n')
+	outfile.close()
+
+	if os.path.getsize(args.target_directory.rstrip('/')+'/update_tmp/all_annos.fna_tmp')==0:
+		print('No target gene was found in the specified sequences, removing intermediate directories and  exiting...\n')
+
+		if args.assemblies!='False':
+			for file in [file for file in os.listdir(args.target_directory) if file.startswith('assembly_summary')\
+				and len(file.split('.'))>2]:
+				os.remove(args.target_directory.rstrip('/')+'/'+file)
+
+		if args.plasmids!='False':
+
+			for file in [file for file in os.listdir(args.target_directory) if file.startswith('plasmid_summary')\
+				and str(file.split('.')[2])!=str(0)]:
+				os.remove(args.target_directory.rstrip('/')+'/'+file)
+
+		if args.local!='False':
+
+			for file in [file for file in os.listdir(args.target_directory) if file.startswith('local_summary')\
+				and str(file.split('.')[2])!=str(0)]:
+				os.remove(args.target_directory.rstrip('/')+'/'+file)
+
+		shutil.rmtree(args.target_directory.rstrip('/')+'/update_tmp')
+
+		sys.exit()
 
 	all_orfs_gff=[args.target_directory.rstrip('/')+'/update_tmp/'+file for file in os.listdir(args.target_directory\
 	.rstrip('/')+'/update_tmp') if file.endswith('_orfs.gff')]	
@@ -972,7 +1484,6 @@ def update():
 
 	to_sql_db(env_dict, args.target_directory.rstrip('/')+'/update_tmp/all_annos.fna_tmp', \
 	args.target_directory)
-
 
 	#run integron finder and integrate into database
 	#Create list with flanking region files
@@ -995,6 +1506,9 @@ def update():
 	transposon_table()
 	merge_files()
 
+	if not args.save_tmps==True:
+		remove_tmps()
+
 #Annotate sequences. Queue is a list like object containing 'tasks' (in this case assembly names) for each process to grab, emptying the queue in the process
 def annotate(queue):
 
@@ -1008,83 +1522,87 @@ def annotate(queue):
 		try:
 			if not os.path.exists(fa_file.replace(ending, '_annotated.csv')):
 				print('Annotating %s...' % os.path.basename(fa_file))
-				#Use diamond to annotate genes with custom thresholds. Accept only one hit per target
+				#Use diamond to annotate genes with local thresholds. Accept only one hit per target
 			if args.processes*split_num>multiprocessing.cpu_count()*2:	
 				threads=int((multiprocessing.cpu_count()*2)/args.processes)
 			else:
 				threads=args.processes
 
-				diamond_blast=f'diamond blastx -p {threads} -d {args.database} -q {fa_file} -o {fa_file.replace(ending, "_annotated.csv")} --id {args.identity} --more-sensitive --quiet --top 100 --masking 0 --subject-cover {args.subject_coverage} -f 6 qseqid sseqid stitle pident qstart qend qlen slen length score qseq qframe qtitle'
-				subprocess.call(diamond_blast, shell=True)
+			if args.long_reads==True:
+				frameshift='-F 1'
+			else:
+				frameshift=''
 
-				#Sort by queryID and start position
+			diamond_blast=f'diamond blastx -p {threads} --quiet -d {args.database} -q {fa_file} -o {fa_file.replace(ending, "_annotated.csv")} --id {args.identity} --more-sensitive --quiet --top 100 --masking 0 {frameshift} --subject-cover {args.subject_coverage} --log -f 6 qseqid sseqid stitle pident qstart qend qlen slen length score qseq qframe qtitle'
+			subprocess.call(diamond_blast, shell=True)
 
-				dmnd_rawout=pd.read_csv(fa_file.replace(ending, '_annotated.csv'), sep='\t', \
-				names=['qseqid', 'sseqid', 'stitle', 'pident', 'qstart', 'qend', 'qlen', 'slen', 'length', 'score', 'qseq', 'qframe', 'qtitle'])
-				dmnd_rawout.sort_values(by=['qseqid', 'qstart']).to_csv(fa_file.replace(ending, '_annotated.csv'), sep='\t', \
-				index=False, header=False)
-				#Assign same start and end position if several gene variants hit the same locus to be able to group by exact position and filter best hit
-				with open(fa_file.replace(ending, '_annotated_rep.csv'), 'w') as rawout:
-					line_number=0
-					for line in open(fa_file.replace(ending, '_annotated.csv'), 'r'):
-						line_number+=1
-						if line_number==1:
-							if not line.split('\t')[-2].startswith('-'):
-								qseqid=line.split('\t')[0]
-								seqstart=line.split('\t')[4]
-								seqend=line.split('\t')[5]
-								rawout.write(line)
-							else: 
+			#Sort by queryID and start position
+			dmnd_rawout=pd.read_csv(fa_file.replace(ending, '_annotated.csv'), sep='\t', \
+			names=['qseqid', 'sseqid', 'stitle', 'pident', 'qstart', 'qend', 'qlen', 'slen', 'length', 'score', 'qseq', 'qframe', 'qtitle'])
+			dmnd_rawout.sort_values(by=['qseqid', 'qstart']).to_csv(fa_file.replace(ending, '_annotated.csv'), sep='\t', \
+			index=False, header=False)
+			#Assign same start and end position if several gene variants hit the same locus to be able to group by exact position and filter best hit
+			with open(fa_file.replace(ending, '_annotated_rep.csv'), 'w') as rawout:
+				line_number=0
+				for line in open(fa_file.replace(ending, '_annotated.csv'), 'r'):
+					line_number+=1
+					if line_number==1:
+						if not line.split('\t')[-2].startswith('-'):
+							qseqid=line.split('\t')[0]
+							seqstart=line.split('\t')[4]
+							seqend=line.split('\t')[5]
+							rawout.write(line)
+						else: 
 
-								qseqid=line.split('\t')[0]
-								seqstart=line.split('\t')[5]
-								seqend=line.split('\t')[4]
-								rawout.write(line)
-						
-						else:	#Do this one time for forward, another time for reverse strand (for reverse strand, switch seqstart and seqend)
-							if not line.split('\t')[-2].startswith('-'):
-								if line.split('\t')[0]==qseqid:
-									if int(line.split('\t')[4]) in range(int(seqstart)-100, int(seqstart)+100) and int(line.split('\t')[5]) in range(int(seqend)-100, int(seqend)+100):
-										newline=line.split('\t')
-										newline[4]=seqstart
-										newline[5]=seqend
-										rawout.write('\t'.join(newline))
-									else:
-
-										seqstart=line.split('\t')[4]
-										seqend=line.split('\t')[5]
-										rawout.write(line)
+							qseqid=line.split('\t')[0]
+							seqstart=line.split('\t')[5]
+							seqend=line.split('\t')[4]
+							rawout.write(line)
+					
+					else:	#Do this one time for forward, another time for reverse strand (for reverse strand, switch seqstart and seqend)
+						if not line.split('\t')[-2].startswith('-'):
+							if line.split('\t')[0]==qseqid:
+								if int(line.split('\t')[4]) in range(int(seqstart)-100, int(seqstart)+100) and int(line.split('\t')[5]) in range(int(seqend)-100, int(seqend)+100):
+									newline=line.split('\t')
+									newline[4]=seqstart
+									newline[5]=seqend
+									rawout.write('\t'.join(newline))
 								else:
 
-									qseqid=line.split('\t')[0]
 									seqstart=line.split('\t')[4]
 									seqend=line.split('\t')[5]
 									rawout.write(line)
 							else:
 
-								if line.split('\t')[0]==qseqid:
-									if int(line.split('\t')[5]) in range(int(seqstart)-100, int(seqstart)+100) and int(line.split('\t')[4]) in range(int(seqend)-100, int(seqend)+100):
-										newline=line.split('\t')
-										newline[5]=seqstart
-										newline[4]=seqend
-										rawout.write('\t'.join(newline))
-									else:
+								qseqid=line.split('\t')[0]
+								seqstart=line.split('\t')[4]
+								seqend=line.split('\t')[5]
+								rawout.write(line)
+						else:
 
-										seqstart=line.split('\t')[5]
-										seqend=line.split('\t')[4]
-										rawout.write(line)
+							if line.split('\t')[0]==qseqid:
+								if int(line.split('\t')[5]) in range(int(seqstart)-100, int(seqstart)+100) and int(line.split('\t')[4]) in range(int(seqend)-100, int(seqend)+100):
+									newline=line.split('\t')
+									newline[5]=seqstart
+									newline[4]=seqend
+									rawout.write('\t'.join(newline))
 								else:
 
-									qseqid=line.split('\t')[0]
 									seqstart=line.split('\t')[5]
 									seqend=line.split('\t')[4]
 									rawout.write(line)
+							else:
+
+								qseqid=line.split('\t')[0]
+								seqstart=line.split('\t')[5]
+								seqend=line.split('\t')[4]
+								rawout.write(line)
 
 
-				#Select best hit
-				dmnd_hits=pd.read_csv(fa_file.replace(ending, '_annotated_rep.csv'), sep='\t', names=['qseqid', 'sseqid', 'stitle', 'pident', 'qstart', 'qend', 'qlen', 'slen', 'length', 'score', 'qseq', 'qframe', 'qtitle'])
-				best_hits=dmnd_hits.loc[dmnd_hits.groupby(['qseqid', 'qstart', 'qend'])['score'].idxmax()]
-				best_hits.to_csv(fa_file.replace(ending, '_annotated.csv'), sep='\t', index=False, header=False)
+			#Select best hit
+			dmnd_hits=pd.read_csv(fa_file.replace(ending, '_annotated_rep.csv'), sep='\t', names=['qseqid', 'sseqid', 'stitle', 'pident', 'qstart', 'qend', 'qlen', 'slen', 'length', 'score', 'qseq', 'qframe', 'qtitle'])
+			best_hits=dmnd_hits.loc[dmnd_hits.groupby(['qseqid', 'qstart', 'qend'])['score'].idxmax()]
+			best_hits.to_csv(fa_file.replace(ending, '_annotated.csv'), sep='\t', index=False, header=False)
 
 					
 		except Exception as e:
@@ -1132,30 +1650,34 @@ def create_db(queue):
 			if len(line)>1:
 				org_dict[line.split('\t')[0]]=line.split('\t')[1].rstrip('\n')+' plasmid'	
 
-	if args.custom!='False':
+	if args.local!='False':
 
 		if not 'org_dict' in locals():
 			org_dict={}
 
-		#Identify most recent custom_summary file
+		#Identify most recent local_summary file
 		summary_files_cust=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
-		if file.startswith('custom_summary')]
+		if file.startswith('local_summary')]
 
 		newest_cust=sorted(summary_files_cust)[-1]
 
 		for line in open(newest_cust, 'r'):
 			if len(line)>1:
-				#Check how much information we have got in the custom summary
-				num_infos = len(line.split('\t'))
-				print('num infos {}'.format(num_infos))
-				print(line)
-				if num_infos>3:
-					info = line.split('\t')[2].rstrip('\n') + ' ' + line.split('\t')[3].rstrip('\n')
-				elif num_infos > 1:
-					info = line.split('\t')[2].rstrip('\n')
+				if args.long_reads=='False':
+					#Check how much information we have got in the local summary
+					num_infos = len(line.split('\t'))
+					print('num infos {}'.format(num_infos))
+					if num_infos>3:
+						info = line.split('\t')[2].rstrip('\n') + ' ' + line.split('\t')[3].rstrip('\n')
+					elif num_infos > 1:
+						info = line.split('\t')[2].rstrip('\n')
+					else:
+						info = 'Unknown'
+					org_dict[line.split('\t')[0]]=info
 				else:
-					info = 'Unknown'
-				org_dict[line.split('\t')[0]]=info
+					info=line.rstrip('\n')
+					org_dict[line]=info
+					
 
 		tax_lines_cust=[line for line in open(newest_cust, 'r') if not line.startswith('#')]
 
@@ -1166,16 +1688,13 @@ def create_db(queue):
 		#Create set of contig accessions that contain annotated gene
 		arg_assemblies={line.split('\t')[0] for line in open(fa_file.replace(ending, '_annotated.csv'), 'r')}
 
-		print(arg_assemblies)	
 		seq_dict={}
 		#Parse genome .csv files
 		for line in open(fa_file.replace(ending, 'csv'), 'r'):
 			acc = line.split('\t')[0].split(' ')[0].lstrip('>')
 			if acc in arg_assemblies:
-				print('')
 				#Create a dictionary containing just the contigs with annotated genes
 				seq_dict[acc]=line.split('\t')[1].rstrip('\n')
-
 
 		#Go through annotated files and extract info
 					
@@ -1190,7 +1709,7 @@ def create_db(queue):
 .readlines())<1:
 			break
 		
-		print('Parsing resistance gene annotations...')
+		print('Parsing annotations...')
 		for line in open(fa_file.replace(ending, '_annotated.csv'), 'r'):
 			nrows+=1
 			gene_name=line.split('\t')[2].split('|')[3].split('[')[0].strip()+'__'+str(nrows)
@@ -1287,7 +1806,6 @@ def create_db(queue):
 					taxon=org_dict[genome_acc]
 
 				except KeyError as e:
-					print('Something went wrong when updating an entry - %s' % str(e))
 
 					taxon='unknown'
 					if args.assemblies==True:
@@ -1295,14 +1813,14 @@ def create_db(queue):
 							if genome_acc in tax_line:
 								print('Identical assembly found!')
 								taxon=org_dict[tax_line.split('\t')[0]]
-					elif args.custom:
+					
+						print('Something went wrong when updating an entry - %s' % str(e))
+
+					elif args.local!='False':
 						for tax_line in tax_lines_cust:
 							if genome_acc in tax_line:
 								print('Identical assembly found!')
 								taxon=org_dict[tax_line.split('\t')[0]]
-
-
-				
 
 				updated_lines.append(line.replace(line.split('\t')[10], flanking_seq+'\t'+str(new_uplen)+\
 			'\t'+str(new_downlen)+'\t'+taxon))	
@@ -1312,6 +1830,7 @@ def create_db(queue):
 		with open(fa_file+'_flanking_regions.csv', 'w') as outfile:
 			for line in updated_lines:
 				outfile.write(line)
+		outfile.close()
 
 		#After finishing the current queue item, grab a new one until 'STOP' is encountered
 		fa_file=queue.get()
@@ -1320,14 +1839,19 @@ def create_db(queue):
 
 def erase_previous():
 
-	print('erasing previous results, this could take a while...')
+	print('Cleaning up target directory...')
 	#Go through all assembly directories and delete the results of previous analyses
 	for root, dirs, files in os.walk(args.target_directory):
 		for file in os.listdir(root):
-			if file.endswith('annotated.csv') or file.endswith('.json') or file.startswith('PROKKA_')\
-			or file.endswith('_gene_contigs.fa') or file.endswith('.val')\
-			or file=='hypothetical_proteins.fa':
+			if file.startswith('all_') or '_summary.txt' in file or file.startswith('orfs_clustered.')\
+			or file.endswith('_database.db') or file.\
+			endswith('_reformatted.fna') or file.endswith('.log') or file.startswith('split_') \
+			or file.startswith('flanking_regions'):
 				os.remove(root+'/'+file)
+
+		if any(element==os.path.basename(root) for element in ['genomes', 'taxonomy', 'kraken2']):
+			shutil.rmtree(root)
+
 	print('Assembly directories cleaned up!')
 
 		
@@ -1359,6 +1883,7 @@ def run_prodigal(queue):
 			with open(fa_file.replace('.fna', '_orfs.fna'), 'w') as outfile:
 				for key, value in orfs.items():
 					outfile.write(key+'\n'+value)
+			outfile.close()
 
 
 		fa_file=queue.get()
@@ -1389,9 +1914,16 @@ def cluster_orfs(orf_file, target_dir):
 		except:
 
 			clust_dict[line.split('>')[1].split('...')[0]]['centroid']=line.split('>')[1].split('...')[0]
+
+	if args.log==True:
+		if os.path.exists(target_dir.rstrip('/')+'/orfs_clustered.fna.clstr') and \
+			os.path.getsize(target_dir.rstrip('/')+'/orfs_clustered.fna.clstr')>0:
+				log_lines.append('ORFs clustered...\n')
+		else:
+			log_lines.append("ORF cluster file wasn't found or is empty...FAILED\n")
+		write_log()
 	
 	return clust_dict
-
 
 def annotate_orfs(queue):
 
@@ -1418,29 +1950,8 @@ def annotate_orfs(queue):
 			else:
 				threads=args.processes
 
-			diamond_call=f'diamond blastp -p {threads} -d {uniprot_db_path} -q {fa_file} -o {fa_file.replace("_orfs.fna", "_orfs_annotated.csv")} --id {args.uniprot_cutoff} --more-sensitive \
-			--max-target-seqs 1 --masking 0 --subject-cover 60 -f 6 qseqid sseqid stitle pident \
-			qstart qend qlen slen length qframe qtitle'
+			diamond_call=f'diamond blastp -p {threads} -d {uniprot_db_path} -q {fa_file} -o {fa_file.replace("_orfs.fna", "_orfs_annotated.csv")} --id {args.uniprot_cutoff} --more-sensitive --max-target-seqs 1 --masking 0 --subject-cover 60 --log -f 6 qseqid sseqid stitle pident qstart qend qlen slen length qframe qtitle'
 			subprocess.call(diamond_call, shell=True)
-
-		if args.is_db==True:
-
-			if args.is_db==True and not os.path.exists(args.is_db):
-				is_db_path=args.target_directory.rstrip("/")+"/is_db.dmnd"
-
-			elif os.path.exists(args.is_db):
-				is_db_path=args.is_db
-
-			#Annotate IS and so on here, with 90% identity
-			if not os.path.exists(fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv')):
-				IS_call='diamond blastp -p %r  -d %s -q %s -o %s --id 90 --more-sensitive \
-				--max-target-seqs 1 --masking 0 --subject-cover 90 -f 6 qseqid sseqid stitle pident \
-				qstart qend qlen slen length qframe qtitle' % (threads, is_db_path, fa_file, fa_file.replace('_orfs.fna', '_orfs_ISannotated.csv'))
-				subprocess.call(IS_call, shell=True)
-
-
-
-
 		fa_file=queue.get()
 		if fa_file=='STOP':
 			return
@@ -1535,11 +2046,13 @@ def integrons_to_db():
 		for file in int_files:
 			for line in open(file, 'r'):
 				outfile.write(line.rstrip('\n')+'\n')
+	outfile.close()
 
 	with open(int_folder+'all_summaries.txt', 'w') as outfile:
 		for file in sum_files:
 			for line in open(file, 'r'):
 				outfile.write(line.rstrip('\n')+'\n')
+	outfile.close()
 
 
 	int_lines=[line for line in open(int_folder+'all_integrons.txt', 'r') \
@@ -1711,8 +2224,22 @@ def to_sql_db(env_dict, all_anno, target_directory):
 		prot_id=line.split('\t')[1].split('|')[1]\
 		+'__'+line.split('\t')[-1].rstrip('\n')
 
-		sum_dict[genome_acc]['organism']=\
-		line.split('\t')[-4]
+		if args.kraken2=='False':
+			sum_dict[genome_acc]['organism']=\
+			line.split('\t')[-4]
+		else:
+			try:
+				if len(line.split('\t')[-2].split(' '))>=2:
+					sum_dict[genome_acc]['organism']=\
+					' '.join(line.split('\t')[-2].split(' ')[1:3])
+				else:
+					sum_dict[genome_acc]['organism']=\
+					line.split('\t')[-2].split(' ')[1]
+
+			except Exception as e:
+				print(f'{e}')
+				sum_dict[genome_acc]['organism']=\
+				'unclassified'
 		try:
 			if not 'plasmid' in sum_dict[genome_acc]['organism']:
 				sum_dict[genome_acc]['taxon']=sci_names[sum_dict[genome_acc]['organism']]
@@ -1764,7 +2291,6 @@ def to_sql_db(env_dict, all_anno, target_directory):
 			file in os.listdir(args.target_directory) \
 			if file.startswith('assembly_summary')]
 
-
 			new_lineages=add_taxonomy_lineages(summary_files)
 
 		if args.plasmids==True:
@@ -1773,15 +2299,13 @@ def to_sql_db(env_dict, all_anno, target_directory):
 			file in os.listdir(args.target_directory) \
 			if file.startswith('plasmid_summary')]
 
-
 			new_lineages=add_taxonomy_lineages(summary_files)
 
-		if args.custom==True:
+		if args.local!='False':
 
 			summary_files=[args.target_directory.rstrip('/')+'/'+file for \
 			file in os.listdir(args.target_directory) \
-			if file.startswith('custom_summary')]
-
+			if file.startswith('local_summary')]
 
 			new_lineages=add_taxonomy_lineages(summary_files)
 
@@ -1838,12 +2362,25 @@ def to_sql_db(env_dict, all_anno, target_directory):
 		cursor.execute('SELECT MAX(id) FROM genomes')
 		results=cursor.fetchall()
 		genome_id=int(results[0][0])
+		pre_update_count=int(results[0][0])
 
 	#Insert genomes
 	for key, value in sum_dict.items():
 		genome_id+=1
-		cursor.execute('INSERT INTO genomes(assembly, organism, taxon_id) VALUES(?,?,?);',\
-		 (key, sum_dict[key]['organism'], sum_dict[key]['taxon']))	
+		try:
+			if args.kraken2!='False':
+				cursor.execute('INSERT INTO genomes(assembly, organism, taxon_id) VALUES(?,?,?);',\
+				 (key.split(' ')[0], sum_dict[key]['organism'], sum_dict[key]['taxon']))	
+			else:
+
+				cursor.execute('INSERT INTO genomes(assembly, organism, taxon_id) VALUES(?,?,?);',\
+				 (key.split(' ')[0], sum_dict[key]['organism'], sum_dict[key]['taxon']))	
+				
+
+		except Exception as e:
+			print(f'{key} not inserted in database - {e}')
+			continue
+			
 
 		#Insert annotated genes
 		for key2, value2 in value['annotated genes'].items():
@@ -1878,26 +2415,187 @@ def to_sql_db(env_dict, all_anno, target_directory):
 			except KeyError as e:
 				print('No genetic environment found for %s - %s' % (key2, e))
 	connection.commit()
-	print('Genes and flanking regions saved to DB!')
+	print('Genes and flanking regions saved to database!')
 
-		
+	
+	cursor.execute('SELECT MAX(id) FROM genomes')
+	results=cursor.fetchall()
+	post_update_count=int(results[0][0])
+
+	if args.log==True:
+		if args.update==True:
+			if pre_update_count<post_update_count:
+				log_lines.append(f'{post_update_count-pre_update_count} genomes added to database...'+'\n')
+			else:
+				log_lines.append('No new genomes in database after update...FAILED(?)\n')
+		else:
+			if post_update_count>0:
+				log_lines.append(f'{post_update_count} genomes added to database...'+'\n')
+			else:
+				log_lines.append('No genomes added to database...FAILED\n')
+		write_log()	
+
+def check_lr_headers():
+	
+	#Check weather headers of long reads are in right format
+	lr_files=[file for file in os.listdir(args.local) if (file.endswith('.fna') or file.endswith('fasta')\
+	 or file.endswith('.fa'))]
+
+	lr_headers=[line for file in lr_files for line in open(f'{os.path.abspath(args.local)}/{file}', 'r') if line.startswith('>')]
+	if len(lr_headers)==0:
+		print('No headers detected for your long read files, make sure your header lines start with ">"')
+		sys.exit()
+	else:
+		#Count numbers of tabs and spaces in header
+		tabs=lr_headers[1].count('\t')
+		spaces=lr_headers[1].count(' ')
+
+		if tabs>0:
+			print('\\t is not allowed in read headers. Please make sure your header format is ">readid\\n" or ">readid organism\\n", t.ex ">SRR1234.1\\n" or ">SRR1234.1 Staphylococcus aureus\\n" ')
+			sys.exit()
+	
+		if spaces>2:
+			print('Multiple spaces detected in local fasta headers. Please make sure your header format is ">readid\\n" or ">readid organism\\n", t.ex ">SRR1234.1\\n" or ">SRR1234.1 Staphylococcus aureus\\n"')
+			sys.exit()
+
 
 def main():
 
 	global args
 	args=parse_arguments()
-	if args.taxa=='False' and args.acc_list=='False':
-		print('No genomes specified for analysis, please specify either "--acc_list" or "" --taxa')
+
+	if not os.path.exists(os.path.abspath(args.database)):
+		print('\nPath specified with -db does not exist, please provide a valid path!\n')
 		sys.exit()
 
+	if not (args.database.endswith('.fna') or args.database.endswith('.fa') or args.database.endswith('.fasta') or args.\
+	database.endswith('.faa')):
+		print('\nIs your -db file in fasta format? Please provide a file ending with .fna, .fa, .faa or .fasta.\n')
+		sys.exit()
+
+	if not os.path.exists(args.target_directory):
+		print('Target directory does not exist, creating...')
+		os.mkdir(args.target_directory)
+
+	if args.clean==True and args.update==True:
+		print('Output from previous run is required for update, --clean and --update cannot be specified at the same time!')
+		sys.exit()
+
+	if args.clean==True and not args.update==True:
+		erase_previous()
+
+	if args.log==True:
+		global log_lines
+		log_lines=[]		
+		#Write command to log file
+		log_lines.append('_'*20+'\n'*2)
+
+		command_string='genview-makedb '
+		for key, value in vars(args).items():
+			if not value=='False':
+				if not value==True:
+					if not key=='taxa':						
+						command_string+=f'--{key} {value} '
+					else:
+						command_string+=f"--{key} "+" ".join(f"'{taxon}'" for taxon in value)+' '
+				else:
+					command_string+=f'--{key} '
+
+		log_lines.append(command_string+'\n'+'_'*20+'\n')
+		write_log()
+
+	if args.long_reads!='False':
+		print('\nLong read function is deactivated atm. For corrected long reads, use --local only.')
+		sys.exit()
+	
+	if args.local!='False':
+		if not os.path.isdir(args.local):
+			print('--local should provide the path to directory containing local genome files!')
+			sys.exit()
+
+		if os.path.abspath(args.local)==os.path.abspath(args.target_directory):
+			print('\nTarget directory and local genome directory are the same - Please create a separate directory for your local sequences and specify it using --local')
+			sys.exit()
+
+		#Check that provided files are fasta files
+		loc_files=[file for file in os.listdir(args.local)]
+
+		non_fasta=False
+		for file in loc_files:
+			if file.endswith('.fna') or file.endswith('.fasta') or file.endswith('.fa') or \
+			file.endswith('.faa') or file.endswith('.ffn'):
+				pass
+			else:
+				non_fasta=True
+
+		if non_fasta==True:
+			print('\nFile endings indicate that there are non-fasta files in the path specified under --local.\nPlease provide fasta files only in this directory, ending on ".fna", ".fa" or ".fasta"\n') 		
+			sys.exit()
+
+	if not args.update==True:
+		#Check if target directory contains files from a previous run
+		targetdir_files=[file for file in os.listdir(args.target_directory)]
+		if ('all_annos.fna_tmp' or 'all_flanks.csv_tmp' or 'all_orfs.fna' or 'assembly_summary.txt' or \
+		'genview_database.db' or 'genview.log' or 'orfs_clustered.fna' or 'plasmid_summary.txt.0' or 'all_assemblies_0.fna') in \
+		targetdir_files:
+			print('\nFiles from previous genview run detected in target directory!\nIf you want to update an existing database, use --update.\nIf you want to start a new run on a previously used target directory, use --clean!\n')
+			sys.exit()
+
+	if args.log==True and args.update==True:
+		
+		#get log file from previous run and add content to log lines
+		if os.path.exists(f'{os.path.abspath(args.target_directory)}/genview.log'):
+			old_log=[line for line in open(f'{os.path.abspath(args.target_directory)}/genview.log')]
+			log_lines.extend(old_log)
+			old_log.append('\n'+'_'*20+'\n')
+
+		#now delete old log files
+		if os.path.exists(f'{os.path.abspath(args.target_directory)}/genview.log'):
+			os.remove(f'{os.path.abspath(args.target_directory)}/genview.log')
+
+		if os.path.exists(f'{os.path.abspath(args.target_directory)}/diamond.log'):
+			os.remove(f'{os.path.abspath(args.target_directory)}/diamond.log')
+
+	if args.taxa=='False' and args.accessions=='False' and args.local=='False':
+		print('No genomes specified for analysis, please specify either "--accessions" or "" --taxa')
+		sys.exit()
+
+
+	if args.kraken2!='False':
+		db_files=[file for file in os.listdir(args.kraken2) if file.endswith('.k2d')]
+		if len(db_files)<1:
+			print('No kraken2 database files detected in specified path, if you want to use kraken2 you need to build a kraken2 database first!')
+			sys.exit()
+	
+	if args.long_reads==True and args.local=='False':
+		print('If --long_reads is specified. --local also needs to be specified!')
+		sys.exit()
+
+	if args.long_reads==True:
+		check_lr_headers()
+
+	if (args.assemblies==True or args.plasmids==True) and (args.long_reads==True or args.local!='False'):
+		print('--local and --assemblies/plasmids cannot be specified at the same time!\n\
+		Create a database with either local data or assemblies/plasmids first and then update it.')
+		sys.exit()
+
+	if args.accessions!='False' and not (args.assemblies==True or args.plasmids==True):
+		print('\nIf accessions are provided using --accession, please specify whether they are assembly accessions, plasmid accessions or both using --assemblies and/or --plasmids.')
+		sys.exit()
+
+	if args.taxa!='False' and args.accessions!='False':
+		print('\n--taxa cannot be specified at the same time as --accessions, please choose only one option.\n\
+		Use the update option to combine local data and data from NCBI.')
+		sys.exit()
+
+	if args.uniprot_db!='False' and not args.uniprot_db.endswith('.dmnd'):
+		print('\n--uniprot_db must specify path to diamond database ending on .dmnd!\n')
+		sys.exit()
+	
 	if args.update==True:
-		print('Update function is momentarily deprecated, exiting...')
+		print('Updating genview database...')
+		update()		
 		sys.exit()
-
-	if args.taxa!='False' and args.acc_list!='False':
-		print('\n--taxa cannot be specified at the same time as --acc_list, please choose only one option\n')
-		sys.exit()
-
 
 	download_uniprot()
 
@@ -1943,6 +2641,40 @@ def main():
 			% (args.target_directory)
 			subprocess.call(download_file, shell=True)
 	
+		#Create assembly file only containing the data on specified taxa
+		if args.taxa!='False':
+			if not args.taxa[0]=='all':
+				tax_asms=[]
+				taxon_lines=[line for line in open(args.target_directory.rstrip('/')+'/assembly_summary.txt', 'r')\
+				if not line.startswith('#')]
+
+				for line in taxon_lines:
+					if any(taxon.lower() in line.lower() for taxon in args.taxa):
+						tax_asms.append(line)
+
+			with open(args.target_directory.rstrip('/')+'/assembly_summary.txt', 'w') as f:
+				for line in tax_asms:
+					f.write(line)
+			f.close()
+		
+		if args.log==True:
+			if os.path.exists(os.path.abspath(args.target_directory)+'/assembly_summary.txt') and \
+			os.path.getsize(os.path.abspath(args.target_directory)+'/assembly_summary.txt')>0:
+				log_lines.append('Assembly summary downloaded and rewritten...\n')
+			else:
+				log_lines.append('Assembly summary not found or empty...FAILED\n')
+			write_log()
+	
+		if not args.accessions=='False':
+			accessions=[line.rstrip('\n') for line in open(args.accessions, 'r')]
+			asm_sum_lines=[line for line in open(args.target_directory.rstrip('/')\
+			+'/assembly_summary.txt', 'r') if any(acc in line for acc in accessions)]
+
+			with open(args.target_directory.rstrip('/')+'/assembly_summary.txt', 'w') as f:
+				for line in asm_sum_lines:
+					f.write(line)
+			f.close()
+
 		#Parse summary file for genomes to download
 		asm_summary=[line for line in open(args.target_directory\
 		.rstrip('/')+'/assembly_summary.txt', 'r') if not line.startswith('#')] 
@@ -1977,8 +2709,8 @@ def main():
 		#Now multiprocess the download of these new genomes into temporary folder
 		#disable for now to make sure not all genomes have to be downloaded again
 		#TODO add exact line lineage in summary file
-		if not args.acc_list=='False':
-			genome_accessions=[line.rstrip('\n').lower() for line in open(args.acc_list, 'r')]
+		if not args.accessions=='False':
+			genome_accessions=[line.rstrip('\n').lower() for line in open(args.accessions, 'r')]
 			genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items() if key.lower() in genome_accessions]
 
 		else:
@@ -1989,7 +2721,17 @@ def main():
 				
 				genome_urls=[asm_dict[key]['url'] for key, value in asm_dict.items()]
 		
+		if args.log==True:
+			if len(genome_urls)>=1:
+				log_lines.append(f'{len(genome_urls)} target genomes identified...'+'\n')
+			else:
+				log_lines.append(f'No target genomes identified...FAILED'+'\n')
+		
 		if len(genome_urls)>=1:
+
+			if not os.path.exists(f'{os.path.abspath(args.target_directory)}/genomes'):
+				os.mkdir(f'{os.path.abspath(args.target_directory)}/genomes')
+
 			multiprocess(download_new, args.processes, genome_urls)
 		else:
 			print('No genomes found that fit the provided input, exiting...')
@@ -1998,18 +2740,29 @@ def main():
 		print('Fetching plasmids...')
 		download_plasmids()
 
+		if 'genome_urls' in locals():
+			genome_urls.extend([line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0', "r")])
+		else:
+			genome_urls=[line for line in open(f'{os.path.abspath(args.target_directory)}/plasmid_summary.txt.0', 'r')]
+
+	if args.local!='False':
+		genome_urls=os.listdir(args.local)
+
+	#If no local summary file exist, create one with the genome IDs
+	if args.local!='False' and not os.path.isfile(args.target_directory.rstrip('/') + '/local_summary.txt.0'):
+		create_simple_summary_file()
 
 	#make split_num available in other functions	
 	global split_num
 
-	if 1<len(genome_urls)<1000:	
-		split_num=1
+	if 1<=len(genome_urls)<1000:	
+		split_num=2
 	elif 1000<len(genome_urls)<10000:	
 		split_num=5
 	elif 10000<len(genome_urls)<100000:	
 		split_num=20
 	else:
-		split_num=100
+		split_num=200
 	#Determine whether split files are already present
 	split_files=[file for file in os.listdir(args.target_directory) if file\
 	.startswith('all_assemblies_') and file.endswith('.csv') and len(file.split('.'))==2]
@@ -2018,10 +2771,6 @@ def main():
 	or len(split_files)==0:
 		concatenate_and_split()	
 	
-	#If no custom summary file exist, create one with the genome/contig IDs
-	if args.custom and not os.path.isfile(args.target_directory.rstrip('/') + '/custom_summary.txt'):
-		create_simple_summary_file()
-
 	print('collecting fasta files for annotation...')
 	#Create list of files containing assemblies in fasta format
 	fa_files=[args.target_directory.rstrip('/')+'/'+fa_file for fa_file \
@@ -2037,7 +2786,34 @@ def main():
 
 	#Define number of processes and empty list for processes
 	multiprocess(annotate, args.processes, fa_files)
+
+	if args.log==True:
+
+		#move diamond.log from current wd to target directory
+		if not os.path.exists(f'{args.target_directory}/diamond.log'):
+			mv_command=f'mv {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}'
+		if os.path.exists(f'{os.path.abspath(args.target_directory)}/diamond.log') and not f'{os.path.abspath(args.target_directory)}'==os.getcwd():
+			mv_command=f'cat {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}/diamond.log > {os.path.abspath(args.target_directory)}/diamond.log'
+		subprocess.call(mv_command, shell=True)
+
+		dmnd_log=[line for line in open(f'{os.path.abspath(args.target_directory)}/diamond.log', 'r') \
+		if 'queries aligned' in line]
+		if len(dmnd_log)==len(fa_files):
+			log_lines.append(f'diamond blastx run successfull...'+'\n')
+		else:
+			log_lines.append(f'diamond blastx run unsuccessfull...FAILED'+'\n')
+		write_log()
 	#Do the same again for the 'create_database' function
+
+	if args.log==True:
+		#Check presence and size of annotation file
+		anno_log=[file for file in os.listdir(args.target_directory.rstrip('/'))\
+			if file.endswith('_annotated.csv')]
+		if len(anno_log)>0:
+			log_lines.append('Annotation files generated...\n')
+		else:
+			log_lines.append('No annotation files could be found...FAILED\n')
+		write_log()
 
 	#Create list with files that have no corresponding flanking region file yet
 	no_flank_files=[element for element in fa_files if not os.path.exists(element+'_flanking_regions.csv')]
@@ -2050,6 +2826,12 @@ def main():
 	if fa_file.startswith('all_assemblies_')\
 	and fa_file.endswith('.fna_flanking_regions.csv')]
 
+	if args.log==True:
+		if len(flank_files)>0:
+			log_lines.append('flanking region files generated...\n')
+		else:
+			log_lines.append('No flanking region files found...FAILED\n')
+		write_log()	
 
 	#summarize all flanking regions into one temporary file
 	lines=[line for file in flank_files for line in open(file, 'r')]
@@ -2057,6 +2839,7 @@ def main():
 	#If no flanking regions were found, exit
 	if len(lines)==0:
 		print('No database matches found, exiting...')
+		erase_previous()
 		sys.exit()
 
 	print('Writing temporary files...')
@@ -2072,6 +2855,7 @@ def main():
 
 			#Write in csv format to outfile
 			outfile.write(str(i)+'\t'+line.split('\t')[-6]+'\n')
+	outfile.close()
 
 	#after assigning id, split the file into specified number of smaller fasta files again
 	outfiles=args.processes
@@ -2088,9 +2872,11 @@ def main():
 		else:
 			file_count+=1
 			line_count=0
+			outfile.close()
 			outfile=open(args.target_directory.rstrip('/')+'/'+\
 			'flanking_regions_'+str(file_count)+'.fna', 'w')
 			outfile.write('>'+line.split('\t')[0]+'\n'+line.split('\t')[-1])
+	outfile.close()
 
 	#Create list with flanking regions file paths
 	flanking_fa=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
@@ -2099,6 +2885,18 @@ def main():
 	#Create a multiprocessing queue from the flanking region files
 	multiprocess(run_prodigal, args.processes, flanking_fa)
 
+	if args.log==True:
+		orf_fna_log=[file for file in os.listdir(args.target_directory.rstrip('/'))\
+		if file.endswith('_orfs.fna')]
+
+		orf_gff_log=[file for file in os.listdir(args.target_directory.rstrip('/'))\
+		if file.endswith('_orfs.gff')]
+	
+		if len(orf_fna_log)>0 and len(orf_gff_log)>0:
+			log_lines.append('ORFs predicted...\n')
+		else:
+			log_lines.append('No ORF files present, something might have gone wrong when running prodigal...\n')
+		write_log()	
 
 	#concatenate all orf files into one for clustering
 	concat_command='cat %s/flanking_regions_*_orfs.fna > %s/all_orfs.fna' % \
@@ -2132,12 +2930,23 @@ def main():
 		if key_count<=round((len(centr_dict)/split_num)+0.5, 0):
 			outfile.write(key+value)
 		else:
+			outfile.close()
 			file_count+=1
 			key_count=0
 			outfile=open(args.target_directory.rstrip('/')+'/'+\
 			'split_'+str(file_count)+'_orfs.fna', 'w')
 			outfile.write(key+value)
 
+	#memory needs to be written to file here
+	outfile.close()
+
+	if args.log==True:
+		orf_split_log=[file for file in os.listdir(args.target_directory.rstrip('/'))\
+		if 'split_' in file and file.endswith('_orfs.fna')]
+		if len(orf_split_log)>0:
+			log_lines.append('ORF files split for annotation...\n')
+		else:
+			log_lines.append('ORF files not split for annotation...FAILED\n')	
 
 	#Do the exact same thing for 'annotate_orfs' function
 	orf_files=[args.target_directory.rstrip('/')+'/'+file for file in \
@@ -2146,12 +2955,37 @@ def main():
 
 	multiprocess(annotate_orfs, args.processes, orf_files)
 
+	if args.log==True:
+		#move diamond.log from current wd to target directory
+		if not os.path.exists(f'{os.path.abspath(args.target_directory)}/diamond.log'):
+			mv_command=f'mv {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}'
+		
+		if os.path.exists(f'{os.path.abspath(args.target_directory)}/diamond.log') and not f'{os.path.abspath(args.target_directory)}'==os.getcwd():
+			mv_command=f'cat {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}/diamond.log > {os.path.abspath(args.target_directory)}/dmnd.log'
+		subprocess.call(mv_command, shell=True)
+
+		if os.path.exists(f'{os.getcwd()}/diamond.log'):
+			os.remove(f'{os.getcwd()}/diamond.log')
+
+		#now rename diamond log
+		mv2=f'mv {os.path.abspath(args.target_directory)}/dmnd.log {os.path.abspath(args.target_directory)}/diamond.log'
+		subprocess.call(mv2, shell=True)
+
+		dmnd_log=[line for line in open(f'{os.path.abspath(args.target_directory)}/diamond.log', 'r') \
+		if 'queries aligned' in line]
+		if len(dmnd_log)/2==len(fa_files):
+			log_lines.append(f'diamond blastp run successfull...'+'\n')
+		else:
+			log_lines.append(f'diamond blastp run unsuccessfull...FAILED'+'\n')
+		write_log()
+
 	#Create a temporary summary file containing the line id
 	with open(args.target_directory.rstrip('/')+'/all_annos.fna_tmp', 'w') as outfile:
 		i=0
 		for line in sorted(lines):
 			i+=1
 			outfile.write(line.rstrip('\n')+'\t'+str(i)+'\n')
+	outfile.close()
 
 	print('summarizing files...')
 	all_orfs_gff=[args.target_directory.rstrip('/')+'/'+file for file in os.listdir(args.target_directory) \
@@ -2210,6 +3044,10 @@ def remove_tmps():
 	for tmp_list in tmps:
 		for element in tmp_list:
 			os.remove(element)
+	
+	#Also remove downloaded genomes
+	if os.path.exists(f'{os.path.abspath(args.target_directory)}/genomes'):
+		shutil.rmtree(f'{os.path.abspath(args.target_directory)}/genomes')
 
 	print('temporary files removed!')
 
@@ -2262,12 +3100,67 @@ def transposon_table():
 				(element[0], element[1], element[2], element[3]))
 
 	connection.commit()
-	print('Arg/transposon associations saved to db!')
 
 def create_simple_summary_file():
-	grep_command = "sed -n 's/>//p' {}/all_assemblies.fna > {}/custom_summary.txt".format(
-			args.target_directory,args.target_directory)
-	subprocess.call(grep_command,shell=True)
+	
+	#Write file names instead of assembly headers to get number of genomes/metagenomes
+	loc_files=[file for file in os.listdir(args.local)]	
+
+	#Determine number of local summary files present and write file
+	local_sums=[file for file in os.listdir(args.target_directory) if file.startswith('local_summary')]
+
+	with open(f'{args.target_directory}/local_summary.txt.{str(len(local_sums))}', 'w') as outfile:
+		for file in loc_files:
+			outfile.write(file.split('.')[0]+'\n')	
+	outfile.close()
+
+
+def kraken2_classify(infile):
+
+	#Enable updating
+	if args.update==True:
+		target_dir=f'{os.path.abspath(args.target_directory)}/update_tmp'
+	else:
+		target_dir=args.target_directory
+
+	#Create kraken2 output directory
+	if not os.path.exists(target_dir.rstrip('/')+'/kraken2'):
+		os.mkdir(target_dir.rstrip('/')+'/kraken2')
+
+	#Classify reads with kraken2
+	if not os.path.exists(f'{os.path.abspath(target_dir)}/kraken2/{os.path.basename(infile).replace(".fna", ".kraken2.out")}'):
+		kraken2=f'kraken2 --db {args.kraken2} --confidence 0.05 --use-names --output {os.path.abspath(target_dir)}/kraken2/{os.path.basename(infile).replace(".fna", ".kraken2.out")} --report {os.path.abspath(target_dir)}/kraken2/{os.path.basename(infile).replace(".fna", ".kraken2.rep")} --threads {args.processes} {infile}'
+		subprocess.call(kraken2, shell=True)
+
+	#Read in read file
+	reads={}
+	for line in open(infile, 'r'):
+		if line.startswith('>'):
+			header=line.lstrip('>').split(' ')[0].rstrip('\n')
+			seq=''
+		else:
+			seq+=line
+			reads[header]=seq
+
+	print(f'number of seqs:{len(reads)}')
+	#Write species/genus assignment to file
+	#parse output file from kraken	
+	class_dict={line.split("\t")[1]+' '+line.split("\t")[2].split("(taxi")[0].rstrip(' ')+'\n':reads\
+		[line.split('\t')[1]] for line in \
+		open(f'{os.path.abspath(target_dir)}/kraken2/{os.path.basename(infile).replace(".fna", ".kraken2.out")}')}
+
+	#Write species assignment and read number to file
+	with open(f'{infile}', 'w') as f:
+		for key, value in class_dict.items():
+			f.write('>'+key+value)
+
+def write_log():
+
+	with open(f'{os.path.abspath(args.target_directory)}/genview.log', 'w') as outfile:
+		for line in log_lines:
+			outfile.write(line)
+	outfile.close()
+
 
 if __name__=='__main__':
 
