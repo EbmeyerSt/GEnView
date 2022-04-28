@@ -6,8 +6,8 @@ package:
   version: "{{ version }}"
 
 source:
-        url: https://github.com/EbmeyerSt/GEnView/archive/refs/tags/v0.1.tar.gz
-        sha256: b297f5c638e186be8cc2c4317aca73f4a67f7c23e5147b6f81afb01f5a64c595
+        url: https://github.com/EbmeyerSt/GEnView/archive/refs/tags/v0.2.tar.gz
+        sha256: a4e2f97aad1af339a2e9f34af3bef4d72ac95589eff066bf10e7db3f72f8db45
 
 build: 
   number: 0
