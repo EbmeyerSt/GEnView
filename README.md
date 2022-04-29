@@ -1,12 +1,10 @@
-# DUE TO A COMING MAJOR UPDATE, THE WIKI IS CURRENTLY UNDER RECONSTRUCTION
-
 # GEnView
 A phylogeny based comparative genomics software to analyze the genetic environment of genes. The user can select one or several taxa and provide one or several reference protein(s). Genomes and plasmids (based on user choice) will be downloaded from the NCBI Assembly/NR database and searched for the respective gene. Alternatively, custom genomes can be provided. User selected stretches (20kbp by default) of the genes genetic environment are extracted, annotated and aligned between all genomes. The sequences are then visualized, enabling comparison of synteny and gene content.
 
 
 # Installation
 
-GEnView can be downloaded using conda:
+GEnView v0.2 can be downloaded using conda:
 `conda install -c bioconda genview`
 
 Alternatively, the code can be downloaded simply through cloning the git repository:
