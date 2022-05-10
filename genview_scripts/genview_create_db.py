@@ -2792,9 +2792,10 @@ def main():
 		#move diamond.log from current wd to target directory
 		if not os.path.exists(f'{args.target_directory}/diamond.log'):
 			mv_command=f'mv {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}'
+			subprocess.call(mv_command, shell=True)
 		if os.path.exists(f'{os.path.abspath(args.target_directory)}/diamond.log') and not f'{os.path.abspath(args.target_directory)}'==os.getcwd():
 			mv_command=f'cat {os.getcwd()}/diamond.log {os.path.abspath(args.target_directory)}/diamond.log > {os.path.abspath(args.target_directory)}/diamond.log'
-		subprocess.call(mv_command, shell=True)
+			subprocess.call(mv_command, shell=True)
 
 		dmnd_log=[line for line in open(f'{os.path.abspath(args.target_directory)}/diamond.log', 'r') \
 		if 'queries aligned' in line]
